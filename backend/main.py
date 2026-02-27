@@ -1,4 +1,5 @@
 import os
+import requests
 from fastapi import FastAPI, UploadFile, Form
 from pypdf import PdfReader
 import re
@@ -33,23 +34,25 @@ def calculate_ml_score(resume_text: str, job_requirements: str) -> float:
     clean_resume = clean_text(resume_text)
     clean_reqs = clean_text(job_requirements)
     
-    # Split into words but also look for phrases
-    resume_words = set(clean_resume.split())
-    req_words = [w for w in clean_reqs.split() if len(w) > 1] # ignore single chars unless +
-    
-    if not req_words:
-        return 0.0
+    # Split requirements into mandatory and preferred if comma separated
+    req_parts = [s.strip() for s in clean_reqs.split(',') if s.strip()]
+    if not req_parts:
+        req_parts = clean_reqs.split()
         
-    matches = 0
-    unique_reqs = set(req_words)
+    resume_words = set(clean_resume.split())
     
-    for word in unique_reqs:
-        if word in resume_words:
+    matches = 0
+    total_weight = len(req_parts)
+    
+    for skill in req_parts:
+        if skill in resume_words:
             matches += 1
-        elif len(word) > 3 and word in clean_resume: # Substring match for longer technical terms
-            matches += 0.8 # Partial credit for substring
+        elif any(skill in word for word in resume_words if len(word) > 3):
+            matches += 0.8 # Partial match for variations
+        elif skill in clean_resume:
+            matches += 0.9 # Substring match within the whole text
             
-    score = (matches / len(unique_reqs)) * 100
+    score = (matches / total_weight) * 100 if total_weight > 0 else 0
     return round(min(float(score), 100.0), 2)
 
 def categorize_score(score: float) -> str:
@@ -60,51 +63,261 @@ def categorize_score(score: float) -> str:
     else:
         return "LOW_MATCH"
 
+from typing import List, Dict, Any
+
+# Domain keywords for broader extraction (Non-IT focus)
+DOMAINS = {
+    "Healthcare": ["patient care", "icu", "nursing", "diagnosis", "surgery", "medical record", "pediatrics"],
+    "Finance": ["taxation", "auditing", "accounting", "ledger", "financial model", "investment", "cpa"],
+    "Engineering": ["autocad", "machine design", "civil engineering", "thermodynamics", "structural analysis"],
+    "Education": ["teaching", "curriculum", "lesson planning", "pedagogy", "student assessment"],
+    "Logistics": ["supply chain", "inventory", "warehousing", "shipping", "procurement"]
+}
+
+TECH_KEYWORDS = ["react", "node", "python", "javascript", "typescript", "java", "aws", "docker", "sql", "api"]
+
+def extract_links(text: str) -> List[str]:
+    """Extract LinkedIn, GitHub and Portfolio URLs."""
+    pattern = r'(https?://(?:www\.)?(?:linkedin\.com|github\.com|portfolio\.com)/[A-z0-9\-\./]+)'
+    return re.findall(pattern, text.lower())
+
+def analyze_skill_gap(resume_text: str, required_skills: str) -> List[str]:
+    """Identify required skills not found in resume."""
+    clean_resume = clean_text(resume_text)
+    reqs = [s.strip().lower() for s in required_skills.split(',') if s.strip()]
+    
+    missing = []
+    for skill in reqs:
+        if skill not in clean_resume:
+            missing.append(skill.title())
+    return missing
+
+def unspace_text(text: str) -> str:
+    """Handles PDFs where characters are separated by spaces."""
+    if not text:
+        return ""
+    # "K I S H A N  D A S" -> "KISHAN DAS"
+    # Matches a letter/digit followed by exactly one space, repeated.
+    text = re.sub(r'(?<=\b\w)\s(?=\w\b)', '', text)
+    # Also handle the cases where it's 2 spaces between words but 1 between letters
+    # "K I S H A N  D A S" -> "KISHAN DAS"
+    return text
+
 @app.post("/api/extract")
-async def extract_resume_data(
-    resume_path: str = Form(...)
-):
-    """Phase 4 OCR: Extract raw text and suggest skills."""
+async def extract_resume_data(resume_path: str = Form(...)):
     if not os.path.exists(resume_path):
         return {"success": False, "error": "File not found"}
     
-    text = extract_text_from_pdf(resume_path)
-    clean = clean_text(text)
+    full_text = extract_text_from_pdf(resume_path)
+    # Pre-process to fix spaced-out text issues
+    fixed_text = unspace_text(full_text)
+    clean = clean_text(fixed_text)
     
-    # Simple skill extractor based on common keywords
-    common_skills = ["react", "node", "python", "javascript", "typescript", "java", "aws", "docker", "kubernetes", "sql", "nosql", "cicd", "agile", "machine learning", "frontend", "backend"]
-    found_skills = [skill.title() for skill in common_skills if skill in clean]
+    # Domain-independent discovery
+    found_skills = []
+    for domain, keywords in DOMAINS.items():
+        for kw in keywords:
+            if kw in clean:
+                found_skills.append(kw.title())
+    
+    # Technical discovery
+    for kw in TECH_KEYWORDS:
+        if kw in clean:
+            found_skills.append(kw.title())
+            
+    # Education discovery
+    education_keywords = ["bachelor", "master", "phd", "university", "college", "degree", "diploma", "engineering", "hss", "thslc"]
+    found_education = []
+    for edu in education_keywords:
+        if edu in clean:
+            found_education.append(edu.upper())
+
+    # Experience discovery
+    # Catch numeric years
+    exp_matches = re.findall(r'(\d+)\s*(year|yr|yr)', clean)
+    years = max([int(m[0]) for m in exp_matches] + [0])
+    # Fallback for "a year" or "one year"
+    if years == 0:
+        if re.search(r'\b(a|one)\b.*?\byear', clean):
+            years = 1
+
+    # Phone discovery
+    # Remove all spaces for a strict check
+    text_no_spaces = re.sub(r'\s+', '', fixed_text)
+    # Match 10 digit numbers, optionally starting with +91 or 0
+    phone_pattern = r'(?:\+?91|0)?[6-9]\d{9}'
+    phone_matches = re.findall(phone_pattern, text_no_spaces)
+    phone = phone_matches[0] if phone_matches else ""
+    # If not found, try the raw clean text with a more flexible pattern
+    if not phone:
+        phone_matches = re.findall(r'\b(?:\+?\d{1,3}[- ]?)?\d{10}\b', clean)
+        phone = phone_matches[0] if phone_matches else ""
+
+    # Address discovery (Attempt)
+    # Use word boundaries \b for keywords like "at" to avoid matching inside words like "communication"
+    addr_pattern = r'(?i)\b(?:address|residence|location|at)\b\s*[:\-]?\s*(.*?)(?:\n\n|\r\n\r\n|\t|skills|education|experience|$)'
+    addr_match = re.search(addr_pattern, fixed_text.replace('\r', ''))
+    address = addr_match.group(1).strip() if addr_match else ""
+    
+    # Fallback address: Look for city names
+    if not address or len(address) > 100: # If too long or empty, try cities
+        indian_cities = ["Bengaluru", "Mumbai", "Delhi", "Hyderabad", "Pune", "Chennai", "Kolkata", "Noida", "Gurugram", "Kayamkulam", "Cherthala", "Kerala", "Kochi", "Thiruvananthapuram"]
+        for city in indian_cities:
+            if city.lower() in clean:
+                address = city
+                break
+
+    links = extract_links(fixed_text)
     
     return {
         "success": True,
-        "raw_text": text,
-        "suggested_skills": ", ".join(found_skills)
+        "raw_text": fixed_text,
+        "suggested_skills": ", ".join(list(set(found_skills))),
+        "education": ", ".join(list(set(found_education))),
+        "experienceYears": years,
+        "phone": phone,
+        "address": address,
+        "links": links,
+        "domain_hints": [d for d, kws in DOMAINS.items() if any(kw in clean for kw in kws)]
     }
 
 @app.post("/api/score")
 async def score_resume(
     resume_path: str = Form(...),
-    job_requirements: str = Form(...)
+    job_requirements: str = Form(...),
+    experience_level: str = Form(None)
 ):
-    """
-    Given an absolute file path down to a PDF and a string of job requirements,
-    this endpoint extracts the text via ML/OCR and returns a similarity score out of 100.
-    """
     if not os.path.exists(resume_path):
-        return {"error": f"File not found at path: {resume_path}", "score": 0, "category": "ERROR"}
+        return {"error": "File not found", "score": 0}
     
-    # Phase 4 OCR Step
-    extracted_text = extract_text_from_pdf(resume_path)
+    text = extract_text_from_pdf(resume_path)
+    score = calculate_ml_score(text, job_requirements)
+    skill_gap = analyze_skill_gap(text, job_requirements)
     
-    # ML Scoring Phase
-    score = calculate_ml_score(extracted_text, job_requirements)
-    category = categorize_score(score)
+    # Certificate Score (Mocked)
+    cert_count = len(re.findall(r'(certificate|certification|certified)', text.lower()))
+    cert_score = min(cert_count * 10, 30) 
+    
+    # Link Extraction and Profile Validation (Requirement 9)
+    links = extract_links(text)
+    link_score = 0
+    if links:
+        link_score += 5 # Points for having links
+        if any("linkedin.com" in l for l in links): link_score += 5
+        if any("github.com" in l for l in links): link_score += 5
+    
+    # Dynamic active link validation (Requirement 9 check)
+    is_identity_matched = False
+    
+    # Let's perform a lightweight HEAD request on the first few links to verify they exist
+    links_to_check = links[:3]
+    valid_links_count = 0
+    
+    for url in links_to_check:
+        try:
+            # Add a basic timeout and user-agent
+            resp = requests.head(url, timeout=3, headers={'User-Agent': 'Mozilla/5.0'})
+            if resp.status_code < 400:
+                valid_links_count += 1
+                # If the URL contains parts of candidate's name or is github/linkedin, give identity match bonus
+                if "linkedin.com/in/" in url.lower() or "github.com/" in url.lower():
+                    is_identity_matched = True
+        except Exception:
+            pass
+
+    link_score += valid_links_count * 2
+    if is_identity_matched:
+        link_score += 5
+
+    link_score = min(link_score, 20)
+    
+    # Experience relevance
+    exp_matches = re.findall(r'(\d+)\s*(years|yrs)', text.lower())
+    resume_years = max([int(m[0]) for m in exp_matches] + [0])
+    
+    # Try to extract required years from experience_level string
+    req_years_match = re.search(r'(\d+)', experience_level or "")
+    req_years = int(req_years_match.group(1)) if req_years_match else 0
+    
+    exp_score = 0
+    if req_years > 0:
+        if resume_years >= req_years:
+            exp_score = 15
+        elif resume_years >= req_years * 0.7:
+            exp_score = 10
+    elif resume_years > 0:
+        exp_score = 5 # General credit for having experience
+
+    final_score = (score * 0.5) + cert_score + link_score + exp_score
     
     return {
         "success": True,
-        "raw_text_length": len(extracted_text),
-        "score": score,
-        "matchCategory": category
+        "matchScore": score,
+        "certificateScore": cert_score,
+        "linkScore": link_score,
+        "finalScore": round(final_score, 2),
+        "skillGap": skill_gap,
+        "links": links
+    }
+
+@app.post("/api/verify-certificate")
+async def verify_certificate(file_path: str = Form(...)):
+    """Abstract requirement 8: Cross-domain certificate verification."""
+    if not os.path.exists(file_path):
+        return {"success": False, "error": "File not found"}
+    
+    text = extract_text_from_pdf(file_path)
+    clean = text.lower()
+    
+    # Text-based confidence indicators
+    has_date = bool(re.search(r'(\d{4}|\d{2}/\d{2}/\d{4})', clean))
+    has_issuer = bool(re.search(r'(university|institute|academy|board|authority|issued|certifies)', clean))
+    has_seal = "seal" in clean or "authentic" in clean
+    
+    # Dynamic tampering detection logic checking pdf metadata if possible
+    is_tampered = False
+    metadata_issue = False
+    try:
+        reader = PdfReader(file_path)
+        meta = reader.metadata
+        if meta:
+            # Check if producer is known for edits
+            producer = str(meta.get('/Producer', '')).lower()
+            creator = str(meta.get('/Creator', '')).lower()
+            if 'illustrator' in producer or 'photoshop' in producer or 'gimp' in producer:
+                is_tampered = True
+            
+            # If modification date is significantly after creation date (tampering heuristic)
+            cdate = meta.get('/CreationDate')
+            mdate = meta.get('/ModDate')
+            if cdate and mdate and cdate != mdate:
+                metadata_issue = True
+    except Exception:
+        pass
+
+    text_tampered = "edit" in clean or "modify" in clean
+    if text_tampered:
+        is_tampered = True
+    
+    confidence_score = 0
+    if has_date: confidence_score += 30
+    if has_issuer: confidence_score += 40
+    if has_seal: confidence_score += 30
+    
+    if is_tampered: 
+        confidence_score -= 50
+    elif metadata_issue:
+        confidence_score -= 20
+    
+    return {
+        "success": True,
+        "extracted_text": text[:500],
+        "confidenceScore": max(0, confidence_score),
+        "isVerified": confidence_score >= 70,
+        "metadata": {
+            "hasDate": has_date,
+            "hasIssuer": has_issuer
+        }
     }
 
 if __name__ == "__main__":

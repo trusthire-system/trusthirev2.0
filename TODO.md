@@ -1,34 +1,54 @@
 # TrustHire Setup & Development Roadmap
 
-## Phase 1: Planning and Setup (Current)
+## Phase 1: Planning and Setup (Completed)
 - [x] Initial project documentation (README, ARCHITECTURE, TODO).
-- [ ] Initialize code repository and commit starting files.
-- [x] Determine remaining stack technologies (Frontend, Backend API, ML/OCR tech). Database chosen: In-memory file-based DB for development. Frontend Next.js.
-- [x] Setup initial projects for Frontend and Backend servers.
+- [x] Initialize code repository and commit starting files.
+- [x] Determine stack: Next.js Frontend, FastAPI/Node.js Backend, Open-Source ML/OCR integration.
+- [x] Adopt **Zero-Cost Implementation** philosophy (using free tiers and OSS).
+- [x] Setup initial directory structure.
 
-## Phase 2: Core User & Database Architecture
-- [x] Design comprehensive database schema for roles (Admin, HR User, Job Seeker).
-- [x] Implement user registration, login workflows, and authentication.
-- [x] Build role-based access control (RBAC).
-- [x] Develop dynamic profile forms (skill setup, work experience, basic info).
+## Phase 2: Core User & Authentication
+- [x] Implement secure onboarding with email verification tokens.
+- [x] Password hashing and secure storage.
+- [x] Role-based access control (RBAC) for Candidate, HR, and Admin.
+- [x] HR-specific registration with organizational domain validation.
 
-## Phase 3: Job Listings & Applications
-- [x] Develop the HR Portal endpoints to post and manage jobs.
-- [x] Develop the Job Seeker portals to browse, apply, and search for jobs.
-- [x] File upload integration for candidate resumes (connecting to cloud storage).
+## Phase 3: Profile & Vacancy Management
+- [x] Dynamic profile building for Candidates.
+- [x] HR company profile creation and industry categorization.
+- [x] Vacancy posting with "Vacancy Count" parameter for shortlisting logic.
+- [x] Multi-industry support (Healthcare, Finance, Engineering, etc.).
+- [x] Implement detailed Job Board filters (Industry, Salary, etc.)
+- [x] Create rich Job Details page with ML Match Insights
+- [x] Visual Application Pipeline Tracker for Candidates
+- [x] Admin Portal enhancement (Firm Verification & Audit)
+- [x] AI Career Guidance & Skill Gap Analysis (Mockup UI)
+- [x] Functional Notification bell for status updates
+- [x] HR Action Pipeline (Shortlist/Reject)
 
-## Phase 4: Core Logic (ML & OCR Engine)
-- [x] Setup Python/ML backend service or microservice for processing uploaded files.
-- [x] Integrate OCR reading software (Tesseract, AWS Textract, etc.) to handle document ingestion.
-- [x] Define point-scoring logic or design ML model to grade candidate experience versus job requirements.
-- [x] Send analysis scores back to core database to segment and tag applications automatically.
+## Phase 4: Intelligent Processing & ML Integration (In Progress/Refining)
+- [x] NLP-based resume data extraction.
+- [x] Domain-independent job match score calculation.
+- [x] Vacancy-based intelligent ranking (Top N shortlisting).
 
-## Phase 5: Recruiter & Admin Activities
-- [x] Implement dashboards for HR users to review segregated and top-scoring applicants based on ML points.
-- [x] Add approve/reject functionality for job requests.
-- [x] Complete the Admin Portal allowing firm approval and oversight across platform users.
+## Phase 4: Verification Engine (Partial)
+- [x] Company verification system (Admin driven)
+- [ ] OCR text extraction & validation
+- [ ] Advanced link/identity validation
 
-## Phase 6: Finalization & Deployment
-- [x] Complete UI design implementation across devices.
-- [x] Set up testing systems.
-- [x] Deployment of services via cloud orchestration (AWS/GCP/Vercel).
+## Phase 5: Dashboard & User Experience
+- [x] Candidate dashboard for application tracking and skill gap reports.
+- [x] HR dashboard for reviewing "System Recommended" candidates.
+- [x] Real-time notification system for application status updates.
+- [x] Admin panel for firm approvals and system health monitoring.
+
+## Phase 5: Notifications & Optimization
+- [x] Real-time (UI) notification system
+- [ ] Cloud orchestration & deployment
+- [ ] Database performance tuning
+
+## Phase 6: Finalization & Optimization
+- [ ] Advanced career guidance suggestions based on skill gap analysis.
+- [ ] Post-placement feedback mechanism for HR and candidates.
+- [ ] Performance optimization for document processing pipeline.
+- [ ] Deployment and cloud orchestration.
