@@ -1,7 +1,7 @@
 {
   "name": "trusthire",
   "scripts": {
-    "dev": "./run_dev.sh",
+    "dev": "python3 dev.py",
     "dev:frontend": "npm run dev --prefix frontend",
     "dev:backend": "cd backend && ./venv/bin/python main.py"
   }

@@ -1,2 +1,0 @@
-Could not create a project called "TrustHire" because of npm naming restrictions:
-    * name can no longer contain capital letters
