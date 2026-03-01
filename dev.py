@@ -83,6 +83,11 @@ def setup_frontend():
         print_error(f"Frontend directory not found at {FRONTEND_DIR}")
         sys.exit(1)
 
+    package_json = os.path.join(FRONTEND_DIR, "package.json")
+    if not os.path.exists(package_json):
+        print_error(f"package.json not found in frontend directory ({package_json}). Please make sure it exists.")
+        sys.exit(1)
+
     npm_cmd = find_executable("npm")
     npx_cmd = find_executable("npx")
     
@@ -96,7 +101,7 @@ def setup_frontend():
     if not os.path.exists(node_modules_dir):
         print_step("node_modules not found. Installing frontend dependencies...")
         try:
-            subprocess.run([npm_cmd, "install"], cwd=FRONTEND_DIR, check=True)
+            subprocess.run([npm_cmd, "--prefix", FRONTEND_DIR, "install"], cwd=FRONTEND_DIR, check=True)
             print_success("Frontend dependencies installed.")
             
             # Generate Prisma after initial install if schema exists
@@ -189,7 +194,7 @@ def main():
     
     try:
         BACKEND_CMD = [backend_python, "main.py"]
-        FRONTEND_CMD = [npm_cmd, "run", "dev"]
+        FRONTEND_CMD = [npm_cmd, "--prefix", FRONTEND_DIR, "run", "dev"]
         
         # Start Backend
         print_step("Starting Backend...")
