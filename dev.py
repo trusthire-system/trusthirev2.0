@@ -96,7 +96,7 @@ def setup_frontend():
     if not os.path.exists(node_modules_dir):
         print_step("node_modules not found. Installing frontend dependencies...")
         try:
-            subprocess.run([npm_cmd, "install"], cwd=FRONTEND_DIR, check=True, shell=(os.name == 'nt'))
+            subprocess.run([npm_cmd, "install"], cwd=FRONTEND_DIR, check=True)
             print_success("Frontend dependencies installed.")
             
             # Generate Prisma after initial install if schema exists
@@ -104,7 +104,7 @@ def setup_frontend():
             if os.path.exists(prisma_schema) and npx_cmd:
                 print_step("Prisma schema found. Generating Prisma client...")
                 try:
-                    subprocess.run([npx_cmd, "prisma", "generate"], cwd=FRONTEND_DIR, check=True, shell=(os.name == 'nt'))
+                    subprocess.run([npx_cmd, "prisma", "generate"], cwd=FRONTEND_DIR, check=True)
                     print_success("Prisma client generated.")
                 except subprocess.CalledProcessError as e:
                     print_error(f"Failed to generate Prisma client: {e}")
@@ -139,9 +139,6 @@ def run_service(cmd, cwd, prefix, color):
         'text': True,
         'bufsize': 1,
     }
-    
-    if os.name == 'nt':
-        kwargs['shell'] = True
 
     try:
         process = subprocess.Popen(cmd, **kwargs)
@@ -214,7 +211,7 @@ def main():
             time.sleep(1)
             b_rc = backend_proc.poll()
             f_rc = frontend_proc.poll()
-            
+             
             if b_rc is not None:
                 print_error(f"Backend process exited unexpectedly (code {b_rc}).")
                 break
