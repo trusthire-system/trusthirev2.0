@@ -1,0 +1,53 @@
+{
+    "Dashboard": {
+        "title": "My Intelligence Dashboard",
+        "subtitle": "Track your professional growth and identity strength.",
+        "recommended": "Recommended for You",
+        "noRecommendations": "No specific recommendations yet. Fill out your skills!",
+        "match": "{score}% MATCH",
+        "profileStrength": "Identity Strength",
+        "completeProfile": "Complete Your Profile",
+        "profileComplete": "Profile Complete",
+        "profileProgress": "Your profile is {progress}% done. Add your skills, experience, and resume to stand out to employers.",
+        "profileSuccess": "Great work! Your profile is fully set up. Employers can now see all your details.",
+        "updateProfile": "Update My Profile",
+        "viewProfile": "View My Profile",
+        "careerIntelligence": "Career Intelligence",
+        "skillGap": "Skill Gap Detected",
+        "roadmap": "View Full Roadmap",
+        "noApplications": "Apply to jobs to receive personalized career guidance.",
+        "milestones": "My Milestones",
+        "recentApplications": "Recent Applications"
+    },
+    "Stats": {
+        "applied": "Jobs Applied",
+        "shortlisted": "Shortlisted",
+        "review": "Under Review",
+        "trustScore": "Trust Score",
+        "notSelected": "Not Selected",
+        "verified": "Fully Verified",
+        "increase": "Complete profile to increase"
+    },
+    "History": {
+        "title": "My Applications",
+        "browse": "Browse Jobs",
+        "noApps": "You haven't applied to any jobs yet.",
+        "findJobs": "Find Jobs",
+        "matchScore": "Match Score",
+        "topFit": "TOP FIT"
+    },
+    "JobBoard": {
+        "title": "TrustHire Job Board",
+        "subtitle": "Discover verified opportunities with transparent ML matching.",
+        "searchPlaceholder": "Search roles, skills, or companies...",
+        "bestMatch": "Best Match",
+        "applied": "Applied",
+        "applyNow": "Apply Now",
+        "processing": "Processing...",
+        "posted": "Posted {date}",
+        "noJobs": "No jobs found matching your search.",
+        "compensation": "Compensation",
+        "experience": "Experience",
+        "verified": "Verified Employer"
+    }
+}

@@ -1,0 +1,101 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// User Model handling authentication and trust
+model User {
+  id               String        @id @default(uuid())
+  email            String        @unique
+  passwordHash     String
+  name             String
+  role             String        // 'CANDIDATE', 'HR_USER', 'ADMIN'
+  isVerified       Boolean       @default(false)
+  verificationTok  String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  // Relations
+  profile          Profile?      @relation(fields: [profileId], references: [id])
+  profileId        String?       @unique
+  company          Company?      @relation(fields: [companyId], references: [id])
+  companyId        String?
+  applications     Application[] // For CANDIDATE
+}
+
+model Profile {
+  id                    String   @id @default(uuid())
+  resumeUrl             String?
+  skills                String?
+  experienceYears       Int      @default(0)
+  education             String?
+  ocrRawText            String?
+  phone                 String?
+  address               String?
+  resumeLastUploadedAt  DateTime?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  user                  User?
+}
+
+// Organizations
+model Company {
+  id               String   @id @default(uuid())
+  name             String
+  industry         String
+  description      String?
+  location         String?
+  website          String?
+  organizationSize String?
+  isVerified       Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  
+  users       User[]
+  jobs        Job[]
+}
+
+// Vacancies with strict counts
+model Job {
+  id              String   @id @default(uuid())
+  title           String
+  description     String
+  requirements    String?  // Required skills
+  preferred       String?  // Nice to have
+  experienceLevel String?
+  salaryRange     String?
+  vacancyCount    Int      @default(1)
+  industry        String?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  
+  companyId     String
+  company       Company  @relation(fields: [companyId], references: [id])
+  applications  Application[]
+}
+
+// Ranked Applications
+model Application {
+  id                String   @id @default(uuid())
+  jobId             String
+  job               Job      @relation(fields: [jobId], references: [id])
+  applicantId       String
+  applicant         User     @relation(fields: [applicantId], references: [id])
+
+  // Scoring Components
+  matchScore        Float    @default(0.0)
+  certificateScore  Float    @default(0.0)
+  linkScore         Float    @default(0.0)
+  finalScore        Float    @default(0.0)
+
+  skillGap          String?  // JSON: Missing required skills
+  isRecommended     Boolean  @default(false) // Whether in top N
+
+  status            String   @default("PENDING") // PENDING, SELECTED, REJECTED, ON_HOLD
+  createdAt         DateTime @default(now())
+}
