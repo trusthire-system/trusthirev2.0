@@ -113,10 +113,11 @@ def setup_frontend():
     # Check and sync Prisma only if client not already generated
     prisma_schema = os.path.join(FRONTEND_DIR, "prisma", "schema.prisma")
     prisma_client_dir = os.path.join(node_modules_dir, ".prisma", "client")
+    prisma_db = os.path.join(FRONTEND_DIR, "prisma", "dev.db")
     
     if os.path.exists(prisma_schema) and npx_cmd:
-        if not os.path.exists(prisma_client_dir):
-            print_step("Prisma client not found. Syncing database and generating client...")
+        if not os.path.exists(prisma_client_dir) or not os.path.exists(prisma_db):
+            print_step("Prisma client or database not found. Syncing database and generating client...")
             
             # 1. Push schema to database
             try:
