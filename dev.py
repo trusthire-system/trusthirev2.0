@@ -110,27 +110,32 @@ def setup_frontend():
     else:
         print_success("Frontend node_modules already exists.")
 
-    # Always check and sync Prisma
+    # Check and sync Prisma only if client not already generated
     prisma_schema = os.path.join(FRONTEND_DIR, "prisma", "schema.prisma")
+    prisma_client_dir = os.path.join(node_modules_dir, ".prisma", "client")
+    
     if os.path.exists(prisma_schema) and npx_cmd:
-        print_step("Prisma schema found. Syncing database...")
-        
-        # 1. Push schema to database
-        try:
-            print_step("Running Prisma db push...")
-            subprocess.run([npx_cmd, "prisma", "db", "push", "--accept-data-loss"], cwd=FRONTEND_DIR, check=True)
-            print_success("Database schema synchronized.")
-        except subprocess.CalledProcessError as e:
-            print_error(f"Failed to push Prisma schema to database: {e}")
-            # Non-fatal error, but we should warn the user
+        if not os.path.exists(prisma_client_dir):
+            print_step("Prisma client not found. Syncing database and generating client...")
+            
+            # 1. Push schema to database
+            try:
+                print_step("Running Prisma db push...")
+                subprocess.run([npx_cmd, "prisma", "db", "push", "--accept-data-loss"], cwd=FRONTEND_DIR, check=True)
+                print_success("Database schema synchronized.")
+            except subprocess.CalledProcessError as e:
+                print_error(f"Failed to push Prisma schema to database: {e}")
+                # Non-fatal error, but we should warn the user
 
-        # 2. Generate Client
-        try:
-            print_step("Generating Prisma client...")
-            subprocess.run([npx_cmd, "prisma", "generate"], cwd=FRONTEND_DIR, check=True)
-            print_success("Prisma client generated.")
-        except subprocess.CalledProcessError as e:
-            print_error(f"Failed to generate Prisma client: {e}")
+            # 2. Generate Client
+            try:
+                print_step("Generating Prisma client...")
+                subprocess.run([npx_cmd, "prisma", "generate"], cwd=FRONTEND_DIR, check=True)
+                print_success("Prisma client generated.")
+            except subprocess.CalledProcessError as e:
+                print_error(f"Failed to generate Prisma client: {e}")
+        else:
+            print_success("Prisma client already generated. Skipping database sync and generation.")
 
     return npm_cmd
 
