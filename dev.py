@@ -104,20 +104,33 @@ def setup_frontend():
             subprocess.run([npm_cmd, "--prefix", FRONTEND_DIR, "install"], cwd=FRONTEND_DIR, check=True)
             print_success("Frontend dependencies installed.")
             
-            # Generate Prisma after initial install if schema exists
-            prisma_schema = os.path.join(FRONTEND_DIR, "prisma", "schema.prisma")
-            if os.path.exists(prisma_schema) and npx_cmd:
-                print_step("Prisma schema found. Generating Prisma client...")
-                try:
-                    subprocess.run([npx_cmd, "prisma", "generate"], cwd=FRONTEND_DIR, check=True)
-                    print_success("Prisma client generated.")
-                except subprocess.CalledProcessError as e:
-                    print_error(f"Failed to generate Prisma client: {e}")
         except subprocess.CalledProcessError as e:
             print_error(f"Failed to install frontend dependencies: {e}")
             sys.exit(1)
     else:
         print_success("Frontend node_modules already exists.")
+
+    # Always check and sync Prisma
+    prisma_schema = os.path.join(FRONTEND_DIR, "prisma", "schema.prisma")
+    if os.path.exists(prisma_schema) and npx_cmd:
+        print_step("Prisma schema found. Syncing database...")
+        
+        # 1. Push schema to database
+        try:
+            print_step("Running Prisma db push...")
+            subprocess.run([npx_cmd, "prisma", "db", "push", "--accept-data-loss"], cwd=FRONTEND_DIR, check=True)
+            print_success("Database schema synchronized.")
+        except subprocess.CalledProcessError as e:
+            print_error(f"Failed to push Prisma schema to database: {e}")
+            # Non-fatal error, but we should warn the user
+
+        # 2. Generate Client
+        try:
+            print_step("Generating Prisma client...")
+            subprocess.run([npx_cmd, "prisma", "generate"], cwd=FRONTEND_DIR, check=True)
+            print_success("Prisma client generated.")
+        except subprocess.CalledProcessError as e:
+            print_error(f"Failed to generate Prisma client: {e}")
 
     return npm_cmd
 
