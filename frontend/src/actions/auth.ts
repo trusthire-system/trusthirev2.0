@@ -14,7 +14,7 @@ async function sendVerificationEmail(toEmail: string, token: string) {
         }
     });
 
-    const verifyUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/verify?token=${token}`;
+    const verifyUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/verify?token=${token}`;
 
     try {
         await transporter.sendMail({
