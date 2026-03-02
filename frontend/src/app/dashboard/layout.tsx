@@ -66,10 +66,7 @@ export default function DashboardLayout({
     const isHR = role === 'HR_USER' || role === 'ADMIN';
 
     const [showNotifications, setShowNotifications] = useState(false);
-    const notifications = [
-        { id: 1, text: "Your application for Senior Frontend Developer was shortlisted!", time: "2h ago", type: "success" },
-        { id: 2, text: "New job matches your profile: Cloud Architect at TechFlow.", time: "5h ago", type: "info" }
-    ];
+    const [notifications, setNotifications] = useState<any[]>([]);
 
     return (
         <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-color-main)' }}>
@@ -208,16 +205,18 @@ export default function DashboardLayout({
                             style={{ cursor: 'pointer', padding: '5px' }}
                         >
                             <Bell size={20} color={showNotifications ? "var(--accent-color)" : "var(--text-secondary)"} />
-                            <span style={{
-                                position: 'absolute',
-                                top: '2px',
-                                right: '2px',
-                                width: '8px',
-                                height: '8px',
-                                background: '#ff4a4a',
-                                borderRadius: '50%',
-                                border: '2px solid var(--bg-color-main)'
-                            }}></span>
+                            {notifications.length > 0 && (
+                                <span style={{
+                                    position: 'absolute',
+                                    top: '2px',
+                                    right: '2px',
+                                    width: '8px',
+                                    height: '8px',
+                                    background: '#ff4a4a',
+                                    borderRadius: '50%',
+                                    border: '2px solid var(--bg-color-main)'
+                                }}></span>
+                            )}
                         </div>
 
                         {showNotifications && (
@@ -234,7 +233,7 @@ export default function DashboardLayout({
                             }}>
                                 <h5 style={{ marginBottom: '1rem', fontSize: '0.9rem' }}>Recent Notifications</h5>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-                                    {notifications.map(n => (
+                                    {notifications.length > 0 ? notifications.map(n => (
                                         <div key={n.id} style={{
                                             padding: '0.8rem',
                                             background: 'rgba(255,255,255,0.02)',
@@ -245,11 +244,15 @@ export default function DashboardLayout({
                                             <p style={{ color: 'var(--text-primary)', marginBottom: '3px' }}>{n.text}</p>
                                             <p style={{ color: 'var(--text-secondary)', fontSize: '0.65rem' }}>{n.time}</p>
                                         </div>
-                                    ))}
+                                    )) : (
+                                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', textAlign: 'center', padding: '1rem 0' }}>No new notifications.</p>
+                                    )}
                                 </div>
-                                <button className="btn-secondary" style={{ width: '100%', marginTop: '1rem', fontSize: '0.7rem', padding: '6px' }}>
-                                    Clear All
-                                </button>
+                                {notifications.length > 0 && (
+                                    <button className="btn-secondary" style={{ width: '100%', marginTop: '1rem', fontSize: '0.7rem', padding: '6px' }} onClick={() => setNotifications([])}>
+                                        Clear All
+                                    </button>
+                                )}
                             </div>
                         )}
                     </div>
