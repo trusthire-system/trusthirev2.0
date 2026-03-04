@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Eye, EyeOff } from "lucide-react";
 
 export default function Register() {
     const router = useRouter();
@@ -10,6 +11,7 @@ export default function Register() {
         name: "",
         email: "",
         password: "",
+        confirmPassword: "",
         role: "CANDIDATE",
         companyName: "",
         industry: "",
@@ -17,17 +19,67 @@ export default function Register() {
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
     const [needsVerification, setNeedsVerification] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+    const calculatePasswordStrength = (password: string) => {
+        let score = 0;
+        if (!password) return score;
+        if (password.length >= 8) score += 1;
+        if (/[A-Z]/.test(password) && /[a-z]/.test(password)) score += 1;
+        if (/[0-9]/.test(password)) score += 1;
+        if (/[^A-Za-z0-9]/.test(password)) score += 1;
+        return Math.min(score, 4);
+    };
+
+    const strengthScore = calculatePasswordStrength(formData.password);
+
+    const getStrengthColor = (score: number) => {
+        switch (score) {
+            case 0: return "var(--text-secondary)";
+            case 1: return "#ff4a4a"; // Weak
+            case 2: return "#ffb34a"; // Fair
+            case 3: return "#4aff8d"; // Good
+            case 4: return "#00ff66"; // Strong
+            default: return "var(--text-secondary)";
+        }
+    };
+
+    const getStrengthText = (score: number) => {
+        switch (score) {
+            case 0: return "";
+            case 1: return "Weak";
+            case 2: return "Fair";
+            case 3: return "Good";
+            case 4: return "Strong";
+            default: return "";
+        }
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError("");
+
+        if (formData.password !== formData.confirmPassword) {
+            setError("Passwords do not match");
+            return;
+        }
+
+        if (strengthScore < 2) {
+            setError("Password is too weak. Please choose a stronger password.");
+            return;
+        }
+
         setLoading(true);
 
         try {
+            const submitData = { ...formData };
+            // @ts-ignore
+            delete submitData.confirmPassword;
             const res = await fetch("/api/auth/register", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(formData),
+                body: JSON.stringify(submitData),
             });
 
             const data = await res.json();
@@ -38,8 +90,12 @@ export default function Register() {
             } else {
                 router.push("/dashboard");
             }
-        } catch (err: any) {
-            setError(err.message || "Registration failed");
+        } catch (err: unknown) {
+            if (err instanceof Error) {
+                setError(err.message || "Registration failed");
+            } else {
+                setError("Registration failed");
+            }
             setLoading(false);
         }
     };
@@ -101,13 +157,92 @@ export default function Register() {
                     </div>
                     <div className="form-group">
                         <label className="form-label">Password</label>
-                        <input
-                            type="password"
-                            className="form-input"
-                            value={formData.password}
-                            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                            required
-                        />
+                        <div style={{ position: "relative" }}>
+                            <input
+                                type={showPassword ? "text" : "password"}
+                                className="form-input"
+                                value={formData.password}
+                                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                                required
+                                style={{ paddingRight: "40px" }}
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                style={{
+                                    position: "absolute",
+                                    right: "10px",
+                                    top: "50%",
+                                    transform: "translateY(-50%)",
+                                    background: "none",
+                                    border: "none",
+                                    color: "var(--text-secondary)",
+                                    cursor: "pointer",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center"
+                                }}
+                            >
+                                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                            </button>
+                        </div>
+                        {formData.password && (
+                            <div style={{ marginTop: "0.5rem" }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", marginBottom: "0.25rem" }}>
+                                    <span style={{ color: "var(--text-secondary)" }}>Password Strength:</span>
+                                    <span style={{ color: getStrengthColor(strengthScore), fontWeight: "bold" }}>{getStrengthText(strengthScore)}</span>
+                                </div>
+                                <div style={{ display: "flex", gap: "4px", height: "4px" }}>
+                                    {[1, 2, 3, 4].map((level) => (
+                                        <div
+                                            key={level}
+                                            style={{
+                                                flex: 1,
+                                                backgroundColor: level <= strengthScore ? getStrengthColor(strengthScore) : "rgba(255,255,255,0.1)",
+                                                borderRadius: "2px",
+                                                transition: "all 0.3s ease"
+                                            }}
+                                        />
+                                    ))}
+                                </div>
+                                <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginTop: "0.5rem", lineHeight: "1.4" }}>
+                                    Help: Use at least 8 characters, with uppercase, lowercase, numbers, and special characters.
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="form-group">
+                        <label className="form-label">Confirm Password</label>
+                        <div style={{ position: "relative" }}>
+                            <input
+                                type={showConfirmPassword ? "text" : "password"}
+                                className="form-input"
+                                value={formData.confirmPassword}
+                                onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                                required
+                                style={{ paddingRight: "40px" }}
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                style={{
+                                    position: "absolute",
+                                    right: "10px",
+                                    top: "50%",
+                                    transform: "translateY(-50%)",
+                                    background: "none",
+                                    border: "none",
+                                    color: "var(--text-secondary)",
+                                    cursor: "pointer",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center"
+                                }}
+                            >
+                                {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                            </button>
+                        </div>
                     </div>
                     <div className="form-group">
                         <label className="form-label">I am a...</label>
