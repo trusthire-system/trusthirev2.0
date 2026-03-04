@@ -25,6 +25,7 @@ model User {
   company          Company?      @relation(fields: [companyId], references: [id])
   companyId        String?
   applications     Application[] // For CANDIDATE
+  notifications    Notification[]
 }
 
 model Profile {
@@ -41,6 +42,19 @@ model Profile {
   updatedAt             DateTime @updatedAt
   
   user                  User?
+  certificates          Certificate[]
+}
+
+model Certificate {
+  id              String   @id @default(uuid())
+  profileId       String
+  profile         Profile  @relation(fields: [profileId], references: [id])
+  name            String
+  category        String   // "EDUCATION", "COURSE", "ACHIEVEMENT"
+  fileUrl         String
+  isVerified      Boolean  @default(false)
+  confidenceScore Int      @default(0)
+  createdAt       DateTime @default(now())
 }
 
 // Organizations
@@ -98,4 +112,14 @@ model Application {
 
   status            String   @default("PENDING") // PENDING, SELECTED, REJECTED, ON_HOLD
   createdAt         DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  text      String
+  type      String   @default("info") // "success", "info", "error"
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
 }

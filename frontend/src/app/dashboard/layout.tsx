@@ -19,20 +19,39 @@ export default function DashboardLayout({
     const [userName, setUserName] = useState<string>('');
 
     useEffect(() => {
-        async function checkRole() {
+        async function fetchInitialData() {
             try {
+                // Check Role & Profile
                 const res = await fetch('/api/profile');
                 if (res.ok) {
                     const data = await res.json();
                     setRole(data.user.role);
                     setUserName(data.user.name?.split(' ')[0] || '');
                 }
+
+                // Fetch Notifications
+                const notifRes = await fetch('/api/notifications');
+                if (notifRes.ok) {
+                    const notifData = await notifRes.json();
+                    if (notifData.notifications) setNotifications(notifData.notifications);
+                }
+
             } catch (err) {
-                console.error("Failed to check role", err);
+                console.error("Failed to fetch initial dashboard data", err);
             }
         }
-        checkRole();
+        fetchInitialData();
     }, []);
+
+    const handleClearNotifications = async () => {
+        try {
+            await fetch('/api/notifications', { method: 'PUT' });
+            setNotifications([]);
+            setShowNotifications(false);
+        } catch (e) {
+            console.error("Failed to clear notifications");
+        }
+    };
 
     const handleLogout = async () => {
         await fetch('/api/auth/logout', { method: 'POST' });
@@ -249,7 +268,7 @@ export default function DashboardLayout({
                                     )}
                                 </div>
                                 {notifications.length > 0 && (
-                                    <button className="btn-secondary" style={{ width: '100%', marginTop: '1rem', fontSize: '0.7rem', padding: '6px' }} onClick={() => setNotifications([])}>
+                                    <button className="btn-secondary" style={{ width: '100%', marginTop: '1rem', fontSize: '0.7rem', padding: '6px' }} onClick={handleClearNotifications}>
                                         Clear All
                                     </button>
                                 )}

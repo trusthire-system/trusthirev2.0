@@ -1,4 +1,5 @@
 import { db } from '../lib/db';
+import logger from '../lib/logger';
 import bcrypt from 'bcryptjs';
 import { SignJWT } from 'jose';
 import nodemailer from 'nodemailer';
@@ -30,9 +31,9 @@ async function sendVerificationEmail(toEmail: string, token: string) {
                 </div>
             `
         });
-        console.log(`[VERIFICATION] Network transmission to ${toEmail} queued.`);
-    } catch (err) {
-        console.error("Mail Error: ", err);
+        logger.info(`[VERIFICATION] Network transmission to ${toEmail} queued.`);
+    } catch (err: any) {
+        logger.error(`Mail Error: ${err.message}`, { err });
     }
 }
 
@@ -52,9 +53,11 @@ export async function createAuthToken(userId: string, role: string) {
 import { v4 as uuidv4 } from 'uuid';
 
 export async function registerUser(data: any) {
+    logger.info(`Starting registration process for email: ${data.email}, role: ${data.role}`);
     const { name, email, password, role, companyName, industry } = data;
 
     if (!name || !email || !password || !role) {
+        logger.warn(`Registration failed. Missing required fields for email: ${data.email}`);
         return { error: 'Required fields missing.' };
     }
 
@@ -67,10 +70,12 @@ export async function registerUser(data: any) {
         const domain = email.split('@')[1]?.toLowerCase();
 
         if (!domain || publicDomains.includes(domain)) {
+            logger.warn(`Registration blocked for HR_USER using public domain email: ${email}`);
             return { error: 'HR registration requires a valid organizational email. Public providers are blocked.' };
         }
 
         if (!companyName || !industry) {
+            logger.warn(`Registration failed. Missing company details for HR_USER: ${email}`);
             return { error: 'Company details are required for HR registration.' };
         }
     }
@@ -78,6 +83,7 @@ export async function registerUser(data: any) {
     try {
         const existingUser = await db.user.findUnique({ where: { email } });
         if (existingUser) {
+            logger.warn(`Registration failed. User with this email already exists: ${email}`);
             return { error: 'User with this email already exists.' };
         }
 
@@ -95,6 +101,7 @@ export async function registerUser(data: any) {
                 verificationTok: verificationToken
             }
         });
+        logger.info(`User created successfully pending verification: ${newUser.id} (${newUser.email})`);
 
         // 3. Handle CANDIDATE: Create Profile
         if (userRole === 'CANDIDATE') {
@@ -103,6 +110,7 @@ export async function registerUser(data: any) {
                 where: { id: newUser.id },
                 data: { profileId: profile.id }
             });
+            logger.info(`Candidate profile created for user: ${newUser.id}`);
         }
 
         // 4. Handle HR: Create/Link Company
@@ -118,6 +126,7 @@ export async function registerUser(data: any) {
                 where: { id: newUser.id },
                 data: { companyId: company.id }
             });
+            logger.info(`Company ${companyName} created and linked to HR user: ${newUser.id}`);
         }
 
         // Dynamic verification email transmission
@@ -130,14 +139,17 @@ export async function registerUser(data: any) {
         };
 
     } catch (error: any) {
+        logger.error(`Error during registration for ${data.email}: ${error.message}`, { error });
         return { error: error.message || 'An error occurred during registration.' };
     }
 }
 
 export async function loginUser(data: any) {
+    logger.info(`Login attempt for email: ${data.email}`);
     const { email, password } = data;
 
     if (!email || !password) {
+        logger.warn(`Login failed. Email and password are required for: ${data.email}`);
         return { error: 'Email and password are required.' };
     }
 
@@ -148,20 +160,24 @@ export async function loginUser(data: any) {
         });
 
         if (!user) {
-            return { error: 'Invalid credentials.' };
+            logger.warn(`Login failed. Invalid credentials (user not found) for: ${email}`);
+            return { error: 'User not found.' };
         }
 
         // 1. Enforce Verification
         if (!user.isVerified) {
+            logger.warn(`Login blocked. Account pending verification for: ${email}`);
             return { error: 'Your account is pending verification. Please check your email.' };
         }
 
         const isValid = await bcrypt.compare(password, user.passwordHash);
         if (!isValid) {
-            return { error: 'Invalid credentials.' };
+            logger.warn(`Login failed. Invalid credentials (password mismatch) for: ${email}`);
+            return { error: 'Incorrect password.' };
         }
 
         const token = await createAuthToken(user.id, user.role);
+        logger.info(`User logged in successfully: ${user.id} (${user.email})`);
         return {
             success: true,
             token,
@@ -173,6 +189,7 @@ export async function loginUser(data: any) {
             }
         };
     } catch (error: any) {
+        logger.error(`Error during login for ${email}: ${error.message}`, { error });
         return { error: error.message || 'An error occurred during login.' };
     }
 }

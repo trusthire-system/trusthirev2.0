@@ -12,7 +12,9 @@ export async function GET() {
         const userWithProfile = await db.user.findUnique({
             where: { id: userId },
             include: {
-                profile: true,
+                profile: {
+                    include: { certificates: true }
+                },
                 applications: {
                     orderBy: { createdAt: 'desc' },
                     include: {

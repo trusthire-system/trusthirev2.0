@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
+import toast from "react-hot-toast";
 
 export default function Register() {
     const router = useRouter();
@@ -16,7 +17,6 @@ export default function Register() {
         companyName: "",
         industry: "",
     });
-    const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
     const [needsVerification, setNeedsVerification] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
@@ -58,15 +58,14 @@ export default function Register() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setError("");
 
         if (formData.password !== formData.confirmPassword) {
-            setError("Passwords do not match");
+            toast.error("Your passwords do not match. Please check and try again.");
             return;
         }
 
         if (strengthScore < 2) {
-            setError("Password is too weak. Please choose a stronger password.");
+            toast.error("Your password is too weak. Try including symbols and numbers.");
             return;
         }
 
@@ -86,15 +85,17 @@ export default function Register() {
             if (!res.ok) throw new Error(data.error);
 
             if (data.needsVerification) {
+                toast.success("Account created successfully! A verification email has been sent.", { duration: 5000 });
                 setNeedsVerification(true);
             } else {
+                toast.success("Registration successful! Setting up your dashboard...");
                 router.push("/dashboard");
             }
         } catch (err: unknown) {
             if (err instanceof Error) {
-                setError(err.message || "Registration failed");
+                toast.error(err.message || "We encountered an issue creating your account. Please try again.");
             } else {
-                setError("Registration failed");
+                toast.error("An unexpected network error interrupted the registration.");
             }
             setLoading(false);
         }
@@ -126,8 +127,6 @@ export default function Register() {
                 <p style={{ color: 'var(--text-secondary)', textAlign: 'center', fontSize: '0.85rem', marginBottom: '1.5rem' }}>
                     Standardized hiring for healthcare, finance, engineering & more.
                 </p>
-
-                {error && <div style={{ color: "#ff4a4a", marginBottom: "1rem", textAlign: "center", fontSize: '0.9rem' }}>{error}</div>}
 
                 <form onSubmit={handleSubmit}>
                     <div className="form-group">

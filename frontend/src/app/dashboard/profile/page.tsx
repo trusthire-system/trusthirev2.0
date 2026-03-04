@@ -18,6 +18,12 @@ export default function ProfilePage() {
     const [success, setSuccess] = useState("");
     const [file, setFile] = useState<File | null>(null);
 
+    // Cert state
+    const [certFile, setCertFile] = useState<File | null>(null);
+    const [certName, setCertName] = useState("");
+    const [certCategory, setCertCategory] = useState("EDUCATION");
+    const [uploadingCert, setUploadingCert] = useState(false);
+
     const [formData, setFormData] = useState({
         skills: "",
         experienceYears: 0,
@@ -120,6 +126,39 @@ export default function ProfilePage() {
             setError(err.message);
         } finally {
             setUploading(false);
+        }
+    };
+
+    const handleCertUpload = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!certFile || !certName || !certCategory) return;
+
+        setUploadingCert(true);
+        setError("");
+        setSuccess("");
+
+        const fileData = new FormData();
+        fileData.append("certificate", certFile);
+        fileData.append("name", certName);
+        fileData.append("category", certCategory);
+
+        try {
+            const res = await fetch("/api/certificates", {
+                method: "POST",
+                body: fileData
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error);
+
+            setSuccess("Certificate uploaded securely. AI Verification processed.");
+            setCertFile(null);
+            setCertName("");
+            loadProfileData();
+            setTimeout(() => setSuccess(""), 5000);
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setUploadingCert(false);
         }
     };
 
@@ -354,6 +393,57 @@ export default function ProfilePage() {
                                 style={{ width: '100%' }}
                             >
                                 {uploading ? "Uploading..." : "Upload Resume"}
+                            </button>
+                        </form>
+                    </div>
+
+                    {/* Certificates Upload Card */}
+                    <div className="glass-card">
+                        <h4 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <GraduationCap size={18} color="var(--accent-color)" /> Certificates
+                        </h4>
+
+                        {profile?.certificates && profile.certificates.length > 0 ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
+                                {profile.certificates.map((cert: any) => (
+                                    <div key={cert.id} style={{
+                                        background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--glass-border)'
+                                    }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                                            <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{cert.name}</span>
+                                            <span style={{ fontSize: '0.75rem', color: 'var(--accent-color)', padding: '2px 8px', background: 'rgba(102,252,241,0.1)', borderRadius: '100px' }}>{cert.category}</span>
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.8rem' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                                {cert.isVerified ? <CheckCircle2 size={14} color="#00cc66" /> : <AlertCircle size={14} color="#ff4a4a" />}
+                                                <span style={{ color: cert.isVerified ? '#00cc66' : '#ff4a4a' }}>
+                                                    {cert.isVerified ? `Verified (Score: ${cert.confidenceScore})` : `Not Verified (Score: ${cert.confidenceScore})`}
+                                                </span>
+                                            </div>
+                                            <a href={cert.fileUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--text-secondary)' }}>View <ExternalLink size={12} /></a>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div style={{ padding: '1rem', border: '1px dashed var(--glass-border)', borderRadius: '12px', textAlign: 'center', marginBottom: '1.5rem' }}>
+                                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>No certificates added.</p>
+                            </div>
+                        )}
+
+                        <form onSubmit={handleCertUpload} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                            <input type="text" className="form-input" placeholder="Certificate Name" value={certName} onChange={e => setCertName(e.target.value)} required />
+                            <select className="form-input" value={certCategory} onChange={e => setCertCategory(e.target.value)} required>
+                                <option value="EDUCATION">Schooling & College</option>
+                                <option value="COURSE">Course or Bootcamps</option>
+                                <option value="ACHIEVEMENT">Other Achievements</option>
+                            </select>
+                            <input type="file" accept=".pdf" onChange={e => setCertFile(e.target.files?.[0] || null)} style={{ display: 'none' }} id="cert-upload" />
+                            <label htmlFor="cert-upload" className="btn-secondary" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: 'pointer' }}>
+                                <CloudUpload size={18} /> {certFile ? certFile.name : "Choose File (PDF)"}
+                            </label>
+                            <button type="submit" className="btn-primary" disabled={!certFile || !certName || uploadingCert} style={{ width: '100%' }}>
+                                {uploadingCert ? "Uploading & Verifying..." : "Upload & Verify"}
                             </button>
                         </form>
                     </div>

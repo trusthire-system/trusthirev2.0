@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
+import toast from "react-hot-toast";
 
 export default function Login() {
     const router = useRouter();
@@ -11,13 +12,11 @@ export default function Login() {
         email: "",
         password: "",
     });
-    const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setError("");
         setLoading(true);
 
         try {
@@ -31,12 +30,13 @@ export default function Login() {
             if (!res.ok) throw new Error(data.error);
 
             // Successfully logged in, redirect based on role or to global dashboard
+            toast.success("Successfully logged in. Getting your dashboard ready...");
             router.push("/dashboard");
         } catch (err: unknown) {
             if (err instanceof Error) {
-                setError(err.message || "Login failed");
+                toast.error(err.message || "We couldn't log you in. Please check your credentials.");
             } else {
-                setError("Login failed");
+                toast.error("An unexpected network error occurred while reaching the authentication server.");
             }
         } finally {
             setLoading(false);
@@ -49,7 +49,6 @@ export default function Login() {
                 <h2 style={{ marginBottom: "1.5rem", textAlign: "center" }}>
                     Welcome back to <span className="title-gradient">TrustHire</span>
                 </h2>
-                {error && <div style={{ color: "#ff4a4a", marginBottom: "1rem", textAlign: "center" }}>{error}</div>}
                 <form onSubmit={handleSubmit}>
                     <div className="form-group">
                         <label className="form-label">Email Address</label>

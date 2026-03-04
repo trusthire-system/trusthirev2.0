@@ -21,8 +21,30 @@ export async function PATCH(
 
         const application = await db.application.update({
             where: { id },
-            data: { status }
+            data: { status },
+            include: { job: true } // Include job to get its title
         });
+
+        // Generate a notification for the candidate
+        let notifText = `Your application status for ${application.job.title} was updated to ${status}.`;
+        let notifType = 'info';
+
+        if (status === 'SELECTED') {
+            notifText = `Congratulations! You have been SELECTED for the ${application.job.title} role!`;
+            notifType = 'success';
+        } else if (status === 'REJECTED') {
+            notifText = `Unfortunately, your application for ${application.job.title} was not selected.`;
+            notifType = 'error';
+        }
+
+        await db.notification.create({
+            data: {
+                userId: application.applicantId,
+                text: notifText,
+                type: notifType
+            }
+        });
+
 
         return NextResponse.json({ success: true, application });
     } catch (error: any) {
