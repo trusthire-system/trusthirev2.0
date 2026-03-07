@@ -11,7 +11,7 @@ export async function GET() {
 
         const notifications = await db.notification.findMany({
             where: {
-                userId: userPayload.userId,
+                userId: (userPayload as any).userId as string,
                 isRead: false
             },
             orderBy: {
@@ -42,7 +42,7 @@ export async function PUT() {
         }
 
         await db.notification.updateMany({
-            where: { userId: userPayload.userId, isRead: false },
+            where: { userId: (userPayload as any).userId as string, isRead: false },
             data: { isRead: true }
         });
 

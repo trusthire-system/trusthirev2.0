@@ -201,19 +201,36 @@ def main():
     print(f"{BLUE}    TrustHire Automated Dev Environment {NC}")
     print(f"{BLUE}========================================{NC}")
     
+    run_prod = '--build' in sys.argv or '--prod' in sys.argv
+    
     # 1. Setup Backend
     backend_python = setup_backend()
     
     # 2. Setup Frontend
     npm_cmd = setup_frontend()
     
+    if run_prod:
+        print_step("Building Frontend for production...")
+        try:
+            subprocess.run([npm_cmd, "--prefix", FRONTEND_DIR, "run", "build"], cwd=FRONTEND_DIR, check=True)
+            print_success("Frontend build complete.")
+        except subprocess.CalledProcessError as e:
+            print_error(f"Frontend build failed: {e}")
+            sys.exit(1)
+            
     print_step("Starting services...")
     
     processes = []
     
     try:
         BACKEND_CMD = [backend_python, "main.py"]
-        FRONTEND_CMD = [npm_cmd, "--prefix", FRONTEND_DIR, "run", "dev"]
+        
+        if run_prod:
+            FRONTEND_CMD = [npm_cmd, "--prefix", FRONTEND_DIR, "run", "start"]
+            server_type = "Production"
+        else:
+            FRONTEND_CMD = [npm_cmd, "--prefix", FRONTEND_DIR, "run", "dev"]
+            server_type = "Development"
         
         # Start Backend
         print_step("Starting Backend...")
@@ -221,13 +238,13 @@ def main():
         processes.append(backend_proc)
         
         # Start Frontend
-        print_step("Starting Frontend...")
+        print_step(f"Starting Frontend ({server_type})...")
         frontend_proc = run_service(FRONTEND_CMD, FRONTEND_DIR, "[FRONTEND]", CYAN)
         processes.append(frontend_proc)
         
         print(f"\n{GREEN}Both services are running!{NC}")
         print(f"Backend Server:  {BLUE}http://localhost:8000{NC} (or as configured in main.py)")
-        print(f"Frontend Server: {CYAN}http://localhost:3000{NC}")
+        print(f"Frontend Server: {CYAN}http://localhost:3000{NC} ({server_type})")
         print(f"Press {RED}Ctrl+C{NC} to stop both services.\n")
         
         # Monitor processes
