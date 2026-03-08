@@ -262,43 +262,41 @@ async def score_resume(
 
 @app.post("/api/verify-certificate")
 async def verify_certificate(file_path: str = Form(...)):
-    """Abstract requirement 8: Cross-domain certificate verification."""
+    """Robust certificate verification."""
     if not os.path.exists(file_path):
         return {"success": False, "error": "File not found"}
     
     text = extract_text_from_pdf(file_path)
     clean = text.lower()
     
-    # Text-based confidence indicators
-    has_date = bool(re.search(r'(\d{4}|\d{2}/\d{2}/\d{4})', clean))
-    has_issuer = bool(re.search(r'(university|institute|academy|board|authority|issued|certifies)', clean))
-    has_seal = "seal" in clean or "authentic" in clean
+    # 1. Date Detection (Expanded to include months)
+    has_date = bool(re.search(r'(\b\d{4}\b|\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}|\b(?:january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2},?\s+\d{4}\b)', clean))
     
-    # Dynamic tampering detection logic checking pdf metadata if possible
+    # 2. Issuer Detection (Expanded terminology)
+    has_issuer = bool(re.search(r'\b(university|institute|academy|board|authority|issued by|certifies|awarded to|presented to|school|college|coursera|udemy|edx|microsoft|google|aws|cisco)\b', clean))
+    
+    # 3. Seal / Signature / Authenticity Verification
+    has_seal = bool(re.search(r'\b(seal|authentic|signature|signed|director|president|dean|verified|credential|authorized|completion|certified)\b', clean))
+    
+    # 4. Tampering detection via PDF Metadata (only heuristic-based, removing raw text match for "edit")
     is_tampered = False
     metadata_issue = False
     try:
         reader = PdfReader(file_path)
         meta = reader.metadata
         if meta:
-            # Check if producer is known for edits
             producer = str(meta.get('/Producer', '')).lower()
-            creator = str(meta.get('/Creator', '')).lower()
             if 'illustrator' in producer or 'photoshop' in producer or 'gimp' in producer:
                 is_tampered = True
             
-            # If modification date is significantly after creation date (tampering heuristic)
             cdate = meta.get('/CreationDate')
             mdate = meta.get('/ModDate')
             if cdate and mdate and cdate != mdate:
+                # Basic check, if modified date length is large and they differ
                 metadata_issue = True
     except Exception:
         pass
 
-    text_tampered = "edit" in clean or "modify" in clean
-    if text_tampered:
-        is_tampered = True
-    
     confidence_score = 0
     if has_date: confidence_score += 30
     if has_issuer: confidence_score += 40
@@ -308,15 +306,17 @@ async def verify_certificate(file_path: str = Form(...)):
         confidence_score -= 50
     elif metadata_issue:
         confidence_score -= 20
-    
+        
     return {
         "success": True,
         "extracted_text": text[:500],
-        "confidenceScore": max(0, confidence_score),
+        "confidenceScore": max(0, min(100, confidence_score)),
         "isVerified": confidence_score >= 70,
         "metadata": {
             "hasDate": has_date,
-            "hasIssuer": has_issuer
+            "hasIssuer": has_issuer,
+            "hasSeal": has_seal,
+            "isTampered": is_tampered
         }
     }
 
