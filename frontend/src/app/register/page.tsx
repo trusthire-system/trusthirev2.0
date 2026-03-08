@@ -97,6 +97,27 @@ export default function Register() {
             } else {
                 toast.error("An unexpected network error interrupted the registration.");
             }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleResend = async () => {
+        setLoading(true);
+        try {
+            const res = await fetch("/api/auth/resend", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: formData.email }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error);
+            toast.success("Verification email resent. Please check your inbox.");
+        } catch (err: unknown) {
+            if (err instanceof Error) {
+                toast.error(err.message || "Failed to resend verification email.");
+            }
+        } finally {
             setLoading(false);
         }
     };
@@ -110,9 +131,30 @@ export default function Register() {
                         A unique verification link has been sent to <strong>{formData.email}</strong>.<br />
                         Please verify your account to access your dashboard.
                     </p>
-                    <Link href="/login" className="btn-primary" style={{ display: 'block', textDecoration: 'none' }}>
-                        Back to Login
-                    </Link>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                        <Link href="/login" className="btn-primary" style={{ display: 'block', textDecoration: 'none' }}>
+                            Back to Login
+                        </Link>
+                        <button
+                            type="button"
+                            onClick={handleResend}
+                            style={{
+                                width: "100%",
+                                background: "transparent",
+                                color: "var(--accent-color)",
+                                border: "1px solid var(--accent-color)",
+                                padding: "0.8rem",
+                                borderRadius: "8px",
+                                cursor: "pointer",
+                                fontWeight: "600",
+                                fontSize: "1rem",
+                                transition: "all 0.2s ease"
+                            }}
+                            disabled={loading}
+                        >
+                            {loading ? "Processing..." : "Resend Verification Email"}
+                        </button>
+                    </div>
                 </div>
             </div>
         );

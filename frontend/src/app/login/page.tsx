@@ -14,6 +14,7 @@ export default function Login() {
     });
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
+    const [needsVerification, setNeedsVerification] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -34,9 +35,34 @@ export default function Login() {
             router.push("/dashboard");
         } catch (err: unknown) {
             if (err instanceof Error) {
-                toast.error(err.message || "We couldn't log you in. Please check your credentials.");
+                const errorMsg = err.message || "We couldn't log you in. Please check your credentials.";
+                toast.error(errorMsg);
+                if (errorMsg.includes("pending verification")) {
+                    setNeedsVerification(true);
+                }
             } else {
                 toast.error("An unexpected network error occurred while reaching the authentication server.");
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleResend = async () => {
+        setLoading(true);
+        try {
+            const res = await fetch("/api/auth/resend", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: formData.email }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error);
+            toast.success("Verification email resent. Please check your inbox.");
+            setNeedsVerification(false);
+        } catch (err: unknown) {
+            if (err instanceof Error) {
+                toast.error(err.message || "Failed to resend verification email.");
             }
         } finally {
             setLoading(false);
@@ -95,6 +121,28 @@ export default function Login() {
                     <button type="submit" className="btn-primary" style={{ width: "100%", marginTop: "1rem" }} disabled={loading}>
                         {loading ? "Logging in..." : "Log In"}
                     </button>
+                    {needsVerification && (
+                        <button
+                            type="button"
+                            onClick={handleResend}
+                            style={{
+                                width: "100%",
+                                marginTop: "1rem",
+                                background: "transparent",
+                                color: "var(--accent-color)",
+                                border: "1px solid var(--accent-color)",
+                                padding: "0.8rem",
+                                borderRadius: "8px",
+                                cursor: "pointer",
+                                fontWeight: "600",
+                                fontSize: "1rem",
+                                transition: "all 0.2s ease"
+                            }}
+                            disabled={loading}
+                        >
+                            {loading ? "Processing..." : "Resend Verification Email"}
+                        </button>
+                    )}
                 </form>
                 <div style={{ marginTop: "1.5rem", textAlign: "center", fontSize: "0.9rem", color: "var(--text-secondary)" }}>
                     Don&apos;t have an account? <Link href="/register" style={{ color: "var(--accent-color)" }}>Sign up</Link>

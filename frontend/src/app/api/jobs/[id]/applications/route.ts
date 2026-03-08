@@ -23,7 +23,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
             where: { jobId: id },
             include: {
                 applicant: {
-                    select: { name: true, email: true, id: true }
+                    select: {
+                        name: true,
+                        email: true,
+                        id: true,
+                        profile: {
+                            include: { certificates: true }
+                        }
+                    }
                 }
             },
             orderBy: { finalScore: 'desc' }

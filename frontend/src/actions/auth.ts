@@ -34,6 +34,7 @@ async function sendVerificationEmail(toEmail: string, token: string) {
         logger.info(`[VERIFICATION] Network transmission to ${toEmail} queued.`);
     } catch (err: any) {
         logger.error(`Mail Error: ${err.message}`, { err });
+        throw new Error("Failed to send verification email. Please check the email address and network.");
     }
 }
 
@@ -130,7 +131,23 @@ export async function registerUser(data: any) {
         }
 
         // Dynamic verification email transmission
-        await sendVerificationEmail(email, verificationToken);
+        try {
+            await sendVerificationEmail(email, verificationToken);
+        } catch (emailError: any) {
+            // Rollback User and associated Profile/Company
+            const userState = await db.user.findUnique({ where: { id: newUser.id }, select: { profileId: true, companyId: true } });
+            if (userState) {
+                await db.user.delete({ where: { id: newUser.id } });
+                if (userState.profileId) {
+                    await db.profile.delete({ where: { id: userState.profileId } });
+                }
+                if (userState.companyId) {
+                    await db.company.delete({ where: { id: userState.companyId } });
+                }
+            }
+            logger.warn(`Registration rolled back for ${email} due to email failure.`);
+            return { error: 'Failed to send verification email. Registration was aborted. Please verify the email address.' };
+        }
 
         return {
             success: true,
@@ -141,6 +158,46 @@ export async function registerUser(data: any) {
     } catch (error: any) {
         logger.error(`Error during registration for ${data.email}: ${error.message}`, { error });
         return { error: error.message || 'An error occurred during registration.' };
+    }
+}
+
+export async function resendVerificationUser(data: { email: string }) {
+    logger.info(`Resend verification attempt for email: ${data.email}`);
+    const { email } = data;
+
+    if (!email) {
+        logger.warn('Resend verification failed. Email is required.');
+        return { error: 'Email is required.' };
+    }
+
+    try {
+        const user = await db.user.findUnique({ where: { email } });
+        if (!user) {
+            logger.warn(`Resend verification failed. User not found for: ${email}`);
+            return { error: 'User not found.' };
+        }
+
+        if (user.isVerified) {
+            logger.info(`Resend verification ignored. User already verified: ${email}`);
+            return { error: 'Account is already verified.' };
+        }
+
+        let token = user.verificationTok;
+        if (!token) {
+            token = uuidv4();
+            await db.user.update({
+                where: { email },
+                data: { verificationTok: token }
+            });
+            logger.info(`Generated new verification token for user: ${email}`);
+        }
+
+        await sendVerificationEmail(email, token);
+        logger.info(`Verification email resent to: ${email}`);
+        return { success: true };
+    } catch (error: any) {
+        logger.error(`Error during resend verification for ${email}: ${error.message}`, { error });
+        return { error: error.message || 'An error occurred while resending verification.' };
     }
 }
 

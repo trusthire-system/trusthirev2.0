@@ -7,8 +7,10 @@ async function main() {
     console.log('Start seeding...');
 
     // Clean existing data
+    await prisma.notification.deleteMany({});
     await prisma.application.deleteMany({});
     await prisma.job.deleteMany({});
+    await prisma.certificate.deleteMany({});
     await prisma.user.deleteMany({});
     await prisma.company.deleteMany({});
     await prisma.profile.deleteMany({});
