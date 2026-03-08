@@ -150,6 +150,22 @@ export default function JobPipelinePage() {
                                     </button>
                                 </>
                             )}
+                            {app.status === 'SELECTED' && (
+                                <button
+                                    onClick={async () => {
+                                        const res = await fetch(`/api/hr/applications/${app.id}/status`, {
+                                            method: 'PATCH',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ status: 'PENDING' })
+                                        });
+                                        if (res.ok) window.location.reload();
+                                    }}
+                                    className="btn-secondary"
+                                    style={{ padding: '6px 12px', fontSize: '0.75rem', color: '#ffa500' }}
+                                >
+                                    Deselect
+                                </button>
+                            )}
                             <button
                                 onClick={() => {
                                     console.log("View Profile clicked for applicant:", app);

@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import {
     User, Mail, Star, GraduationCap, Briefcase,
     FileUp, CheckCircle2, AlertCircle, ExternalLink,
-    Save, CloudUpload, TrendingUp, Phone, MapPin, Clock
+    Save, CloudUpload, TrendingUp, Phone, MapPin, Clock,
+    Users, BarChart, CheckCircle
 } from "lucide-react";
 
 export default function ProfilePage() {
@@ -23,6 +24,7 @@ export default function ProfilePage() {
     const [certName, setCertName] = useState("");
     const [certCategory, setCertCategory] = useState("EDUCATION");
     const [uploadingCert, setUploadingCert] = useState(false);
+    const [hrStats, setHrStats] = useState<any>(null);
 
     const [formData, setFormData] = useState({
         skills: "",
@@ -50,6 +52,18 @@ export default function ProfilePage() {
                     phone: data.profile.phone || "",
                     address: data.profile.address || ""
                 });
+            }
+
+            if (data.user?.role === 'HR_USER' || data.user?.role === 'ADMIN') {
+                try {
+                    const statsRes = await fetch("/api/hr/stats");
+                    if (statsRes.ok) {
+                        const statsData = await statsRes.json();
+                        setHrStats(statsData.stats);
+                    }
+                } catch (e) {
+                    console.error("Failed to load HR stats", e);
+                }
             }
         } catch (err: any) {
             setError(err.message);
@@ -191,34 +205,38 @@ export default function ProfilePage() {
                     My <span className="title-gradient">Profile</span>
                 </h1>
                 <p style={{ color: "var(--text-secondary)" }}>
-                    Keep your profile complete so employers can find the best match for you.
+                    {user.role === 'CANDIDATE'
+                        ? "Keep your profile complete so employers can find the best match for you."
+                        : "Manage your account and view your professional details."}
                 </p>
             </div>
 
             {/* Profile Completeness Meter */}
-            <div className="glass-card" style={{ marginBottom: '2.5rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <TrendingUp size={18} color={profileStrengthColor} />
-                        <span style={{ fontWeight: 600 }}>Profile Completeness</span>
+            {user.role === 'CANDIDATE' && (
+                <div className="glass-card" style={{ marginBottom: '2.5rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <TrendingUp size={18} color={profileStrengthColor} />
+                            <span style={{ fontWeight: 600 }}>Profile Completeness</span>
+                        </div>
+                        <span style={{ color: profileStrengthColor, fontWeight: 700, fontSize: '1rem' }}>{identityStrength}% — {profileStrengthLabel}</span>
                     </div>
-                    <span style={{ color: profileStrengthColor, fontWeight: 700, fontSize: '1rem' }}>{identityStrength}% — {profileStrengthLabel}</span>
+                    <div style={{ width: '100%', height: '10px', background: 'rgba(255,255,255,0.05)', borderRadius: '100px', overflow: 'hidden' }}>
+                        <div style={{
+                            width: `${identityStrength}%`,
+                            height: '100%',
+                            background: `linear-gradient(90deg, ${profileStrengthColor}88, ${profileStrengthColor})`,
+                            transition: 'width 1s ease-in-out',
+                            borderRadius: '100px'
+                        }} />
+                    </div>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', marginTop: '0.75rem' }}>
+                        {identityStrength < 100
+                            ? "💡 Tip: Fill in all sections below including a resume to improve your chances of getting hired."
+                            : "✅ Your profile is complete! Employers can now see the best version of you."}
+                    </p>
                 </div>
-                <div style={{ width: '100%', height: '10px', background: 'rgba(255,255,255,0.05)', borderRadius: '100px', overflow: 'hidden' }}>
-                    <div style={{
-                        width: `${identityStrength}%`,
-                        height: '100%',
-                        background: `linear-gradient(90deg, ${profileStrengthColor}88, ${profileStrengthColor})`,
-                        transition: 'width 1s ease-in-out',
-                        borderRadius: '100px'
-                    }} />
-                </div>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', marginTop: '0.75rem' }}>
-                    {identityStrength < 100
-                        ? "💡 Tip: Fill in all sections below including a resume to improve your chances of getting hired."
-                        : "✅ Your profile is complete! Employers can now see the best version of you."}
-                </p>
-            </div>
+            )}
 
             {error && (
                 <div style={{
@@ -279,174 +297,178 @@ export default function ProfilePage() {
                     </div>
 
                     {/* Resume Upload Card */}
-                    <div className="glass-card">
-                        <h4 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <FileUp size={18} color="var(--accent-color)" /> Your Resume
-                        </h4>
+                    {user.role === 'CANDIDATE' && (
+                        <div className="glass-card">
+                            <h4 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <FileUp size={18} color="var(--accent-color)" /> Your Resume
+                            </h4>
 
-                        {profile?.resumeUrl ? (
-                            <div style={{
-                                background: 'rgba(0, 204, 102, 0.05)',
-                                padding: '1rem',
-                                borderRadius: '12px',
-                                border: '1px solid rgba(0, 204, 102, 0.15)',
-                                marginBottom: '1.5rem'
-                            }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '0.8rem' }}>
-                                    <CheckCircle2 size={16} color="#00cc66" />
-                                    <span style={{ fontSize: '0.9rem', color: '#00cc66', fontWeight: 600 }}>Resume Uploaded</span>
+                            {profile?.resumeUrl ? (
+                                <div style={{
+                                    background: 'rgba(0, 204, 102, 0.05)',
+                                    padding: '1rem',
+                                    borderRadius: '12px',
+                                    border: '1px solid rgba(0, 204, 102, 0.15)',
+                                    marginBottom: '1.5rem'
+                                }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '0.8rem' }}>
+                                        <CheckCircle2 size={16} color="#00cc66" />
+                                        <span style={{ fontSize: '0.9rem', color: '#00cc66', fontWeight: 600 }}>Resume Uploaded</span>
+                                    </div>
+                                    {profile.resumeLastUploadedAt && (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)', fontSize: '0.75rem', marginBottom: '1rem' }}>
+                                            <Clock size={12} />
+                                            <span>Last Uploaded: {new Date(profile.resumeLastUploadedAt).toLocaleString()}</span>
+                                        </div>
+                                    )}
+                                    <a
+                                        href={profile.resumeUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        style={{ color: 'var(--accent-color)', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '5px' }}
+                                    >
+                                        View Your Resume <ExternalLink size={14} />
+                                    </a>
                                 </div>
-                                {profile.resumeLastUploadedAt && (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)', fontSize: '0.75rem', marginBottom: '1rem' }}>
-                                        <Clock size={12} />
-                                        <span>Last Uploaded: {new Date(profile.resumeLastUploadedAt).toLocaleString()}</span>
-                                    </div>
-                                )}
-                                <a
-                                    href={profile.resumeUrl}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    style={{ color: 'var(--accent-color)', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '5px' }}
-                                >
-                                    View Your Resume <ExternalLink size={14} />
-                                </a>
-                            </div>
-                        ) : (
-                            <div style={{
-                                padding: '1.5rem',
-                                border: '1px dashed var(--glass-border)',
-                                borderRadius: '12px',
-                                textAlign: 'center',
-                                marginBottom: '1.5rem'
-                            }}>
-                                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>No resume uploaded yet.</p>
-                                <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>Uploading a resume helps employers find you.</p>
-                            </div>
-                        )}
-
-                        {/* Dynamic Extraction Summary */}
-                        {profile?.resumeUrl && (
-                            <div style={{
-                                background: 'rgba(102, 252, 241, 0.03)',
-                                padding: '1rem',
-                                borderRadius: '12px',
-                                border: '1px solid rgba(102, 252, 241, 0.1)',
-                                marginBottom: '1.5rem',
-                                fontSize: '0.85rem'
-                            }}>
-                                <p style={{ fontWeight: 600, color: 'var(--accent-color)', marginBottom: '0.8rem', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                    AI Resume Insights
-                                </p>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                        <span style={{ color: 'var(--text-secondary)' }}>Detected Phone:</span>
-                                        <span style={{ color: profile.phone ? 'var(--text-primary)' : '#ff4a4a' }}>{profile.phone || 'Missing'}</span>
-                                    </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                        <span style={{ color: 'var(--text-secondary)' }}>Detected Location:</span>
-                                        <span style={{ color: profile.address ? 'var(--text-primary)' : '#ff4a4a' }}>{profile.address || 'Missing'}</span>
-                                    </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                        <span style={{ color: 'var(--text-secondary)' }}>Exp. Found:</span>
-                                        <span style={{ color: 'var(--text-primary)' }}>{profile.experienceYears} Years</span>
-                                    </div>
+                            ) : (
+                                <div style={{
+                                    padding: '1.5rem',
+                                    border: '1px dashed var(--glass-border)',
+                                    borderRadius: '12px',
+                                    textAlign: 'center',
+                                    marginBottom: '1.5rem'
+                                }}>
+                                    <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>No resume uploaded yet.</p>
+                                    <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>Uploading a resume helps employers find you.</p>
                                 </div>
-                            </div>
-                        )}
-
-                        <form onSubmit={handleFileUpload}>
-                            <input
-                                type="file"
-                                accept=".pdf,.doc,.docx"
-                                onChange={(e) => {
-                                    if (e.target.files && e.target.files.length > 0) {
-                                        setFile(e.target.files[0]);
-                                    }
-                                }}
-                                style={{ display: 'none' }}
-                                id="resume-upload"
-                            />
-                            <label
-                                htmlFor="resume-upload"
-                                className="btn-secondary"
-                                style={{
-                                    width: '100%',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    gap: '8px',
-                                    cursor: 'pointer',
-                                    marginBottom: '1rem'
-                                }}
-                            >
-                                <CloudUpload size={18} /> Choose File (PDF / Word)
-                            </label>
-                            {file && (
-                                <p style={{ fontSize: '0.78rem', textAlign: 'center', marginBottom: '1rem', color: 'var(--accent-color)' }}>
-                                    Selected: {file.name}
-                                </p>
                             )}
-                            <button
-                                type="submit"
-                                className="btn-primary"
-                                disabled={!file || uploading}
-                                style={{ width: '100%' }}
-                            >
-                                {uploading ? "Uploading..." : "Upload Resume"}
-                            </button>
-                        </form>
-                    </div>
+
+                            {/* Dynamic Extraction Summary */}
+                            {profile?.resumeUrl && (
+                                <div style={{
+                                    background: 'rgba(102, 252, 241, 0.03)',
+                                    padding: '1rem',
+                                    borderRadius: '12px',
+                                    border: '1px solid rgba(102, 252, 241, 0.1)',
+                                    marginBottom: '1.5rem',
+                                    fontSize: '0.85rem'
+                                }}>
+                                    <p style={{ fontWeight: 600, color: 'var(--accent-color)', marginBottom: '0.8rem', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                        AI Resume Insights
+                                    </p>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                            <span style={{ color: 'var(--text-secondary)' }}>Detected Phone:</span>
+                                            <span style={{ color: profile.phone ? 'var(--text-primary)' : '#ff4a4a' }}>{profile.phone || 'Missing'}</span>
+                                        </div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                            <span style={{ color: 'var(--text-secondary)' }}>Detected Location:</span>
+                                            <span style={{ color: profile.address ? 'var(--text-primary)' : '#ff4a4a' }}>{profile.address || 'Missing'}</span>
+                                        </div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                            <span style={{ color: 'var(--text-secondary)' }}>Exp. Found:</span>
+                                            <span style={{ color: 'var(--text-primary)' }}>{profile.experienceYears} Years</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            <form onSubmit={handleFileUpload}>
+                                <input
+                                    type="file"
+                                    accept=".pdf,.doc,.docx"
+                                    onChange={(e) => {
+                                        if (e.target.files && e.target.files.length > 0) {
+                                            setFile(e.target.files[0]);
+                                        }
+                                    }}
+                                    style={{ display: 'none' }}
+                                    id="resume-upload"
+                                />
+                                <label
+                                    htmlFor="resume-upload"
+                                    className="btn-secondary"
+                                    style={{
+                                        width: '100%',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '8px',
+                                        cursor: 'pointer',
+                                        marginBottom: '1rem'
+                                    }}
+                                >
+                                    <CloudUpload size={18} /> Choose File (PDF / Word)
+                                </label>
+                                {file && (
+                                    <p style={{ fontSize: '0.78rem', textAlign: 'center', marginBottom: '1rem', color: 'var(--accent-color)' }}>
+                                        Selected: {file.name}
+                                    </p>
+                                )}
+                                <button
+                                    type="submit"
+                                    className="btn-primary"
+                                    disabled={!file || uploading}
+                                    style={{ width: '100%' }}
+                                >
+                                    {uploading ? "Uploading..." : "Upload Resume"}
+                                </button>
+                            </form>
+                        </div>
+                    )}
 
                     {/* Certificates Upload Card */}
-                    <div className="glass-card">
-                        <h4 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <GraduationCap size={18} color="var(--accent-color)" /> Certificates
-                        </h4>
+                    {user.role === 'CANDIDATE' && (
+                        <div className="glass-card">
+                            <h4 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <GraduationCap size={18} color="var(--accent-color)" /> Certificates
+                            </h4>
 
-                        {profile?.certificates && profile.certificates.length > 0 ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
-                                {profile.certificates.map((cert: any) => (
-                                    <div key={cert.id} style={{
-                                        background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--glass-border)'
-                                    }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-                                            <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{cert.name}</span>
-                                            <span style={{ fontSize: '0.75rem', color: 'var(--accent-color)', padding: '2px 8px', background: 'rgba(102,252,241,0.1)', borderRadius: '100px' }}>{cert.category}</span>
-                                        </div>
-                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.8rem' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                                {cert.isVerified ? <CheckCircle2 size={14} color="#00cc66" /> : <AlertCircle size={14} color="#ff4a4a" />}
-                                                <span style={{ color: cert.isVerified ? '#00cc66' : '#ff4a4a' }}>
-                                                    {cert.isVerified ? `Verified (Score: ${cert.confidenceScore})` : `Not Verified (Score: ${cert.confidenceScore})`}
-                                                </span>
+                            {profile?.certificates && profile.certificates.length > 0 ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
+                                    {profile.certificates.map((cert: any) => (
+                                        <div key={cert.id} style={{
+                                            background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--glass-border)'
+                                        }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                                                <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{cert.name}</span>
+                                                <span style={{ fontSize: '0.75rem', color: 'var(--accent-color)', padding: '2px 8px', background: 'rgba(102,252,241,0.1)', borderRadius: '100px' }}>{cert.category}</span>
                                             </div>
-                                            <a href={cert.fileUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--text-secondary)' }}>View <ExternalLink size={12} /></a>
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.8rem' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                                    {cert.isVerified ? <CheckCircle2 size={14} color="#00cc66" /> : <AlertCircle size={14} color="#ff4a4a" />}
+                                                    <span style={{ color: cert.isVerified ? '#00cc66' : '#ff4a4a' }}>
+                                                        {cert.isVerified ? `Verified (Score: ${cert.confidenceScore})` : `Not Verified (Score: ${cert.confidenceScore})`}
+                                                    </span>
+                                                </div>
+                                                <a href={cert.fileUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--text-secondary)' }}>View <ExternalLink size={12} /></a>
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <div style={{ padding: '1rem', border: '1px dashed var(--glass-border)', borderRadius: '12px', textAlign: 'center', marginBottom: '1.5rem' }}>
-                                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>No certificates added.</p>
-                            </div>
-                        )}
+                                    ))}
+                                </div>
+                            ) : (
+                                <div style={{ padding: '1rem', border: '1px dashed var(--glass-border)', borderRadius: '12px', textAlign: 'center', marginBottom: '1.5rem' }}>
+                                    <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>No certificates added.</p>
+                                </div>
+                            )}
 
-                        <form onSubmit={handleCertUpload} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                            <input type="text" className="form-input" placeholder="Certificate Name" value={certName} onChange={e => setCertName(e.target.value)} required />
-                            <select className="form-input" value={certCategory} onChange={e => setCertCategory(e.target.value)} required>
-                                <option value="EDUCATION">Schooling & College</option>
-                                <option value="COURSE">Course or Bootcamps</option>
-                                <option value="ACHIEVEMENT">Other Achievements</option>
-                            </select>
-                            <input type="file" accept=".pdf" onChange={e => setCertFile(e.target.files?.[0] || null)} style={{ display: 'none' }} id="cert-upload" />
-                            <label htmlFor="cert-upload" className="btn-secondary" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: 'pointer' }}>
-                                <CloudUpload size={18} /> {certFile ? certFile.name : "Choose File (PDF)"}
-                            </label>
-                            <button type="submit" className="btn-primary" disabled={!certFile || !certName || uploadingCert} style={{ width: '100%' }}>
-                                {uploadingCert ? "Uploading & Verifying..." : "Upload & Verify"}
-                            </button>
-                        </form>
-                    </div>
+                            <form onSubmit={handleCertUpload} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                <input type="text" className="form-input" placeholder="Certificate Name" value={certName} onChange={e => setCertName(e.target.value)} required />
+                                <select className="form-input" value={certCategory} onChange={e => setCertCategory(e.target.value)} required>
+                                    <option value="EDUCATION">Schooling & College</option>
+                                    <option value="COURSE">Course or Bootcamps</option>
+                                    <option value="ACHIEVEMENT">Other Achievements</option>
+                                </select>
+                                <input type="file" accept=".pdf" onChange={e => setCertFile(e.target.files?.[0] || null)} style={{ display: 'none' }} id="cert-upload" />
+                                <label htmlFor="cert-upload" className="btn-secondary" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: 'pointer' }}>
+                                    <CloudUpload size={18} /> {certFile ? certFile.name : "Choose File (PDF)"}
+                                </label>
+                                <button type="submit" className="btn-primary" disabled={!certFile || !certName || uploadingCert} style={{ width: '100%' }}>
+                                    {uploadingCert ? "Uploading & Verifying..." : "Upload & Verify"}
+                                </button>
+                            </form>
+                        </div>
+                    )}
                 </div>
 
                 {/* Right Column: Profile Details Form */}
@@ -558,17 +580,48 @@ export default function ProfilePage() {
                             </button>
                         </form>
                     ) : (
-                        <div style={{
-                            padding: '3rem',
-                            textAlign: 'center',
-                            background: 'rgba(0,0,0,0.1)',
-                            borderRadius: '12px',
-                            border: '1px solid var(--glass-border)'
-                        }}>
-                            <p style={{ color: "var(--accent-color)", fontWeight: 600 }}>Employer Account</p>
-                            <p style={{ color: "var(--text-secondary)", fontSize: '0.9rem', marginTop: '1rem' }}>
-                                This area is for job seekers. As an employer, you can manage your job posts from the Opportunities section.
-                            </p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                            <div style={{
+                                padding: '2rem',
+                                background: 'rgba(102, 252, 241, 0.05)',
+                                borderRadius: '12px',
+                                border: '1px solid rgba(102, 252, 241, 0.1)',
+                                textAlign: 'center'
+                            }}>
+                                <p style={{ color: "var(--accent-color)", fontWeight: 600, fontSize: '1.1rem', marginBottom: '0.5rem' }}>HR Dashboard Summary</p>
+                                <p style={{ color: "var(--text-secondary)", fontSize: '0.9rem' }}>
+                                    Welcome to your employer profile. Here is a quick overview of your recruiting pipeline.
+                                </p>
+                            </div>
+
+                            {hrStats ? (
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                    <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1.5rem', borderRadius: '12px', textAlign: 'center', border: '1px solid var(--glass-border)' }}>
+                                        <Briefcase size={28} color="var(--accent-color)" style={{ margin: '0 auto 0.5rem auto' }} />
+                                        <h4 style={{ fontSize: '1.8rem', margin: '0 0 0.2rem 0' }}>{hrStats.totalJobs}</h4>
+                                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Active Job Postings</p>
+                                    </div>
+                                    <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1.5rem', borderRadius: '12px', textAlign: 'center', border: '1px solid var(--glass-border)' }}>
+                                        <Users size={28} color="#00cc66" style={{ margin: '0 auto 0.5rem auto' }} />
+                                        <h4 style={{ fontSize: '1.8rem', margin: '0 0 0.2rem 0' }}>{hrStats.totalApplications}</h4>
+                                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Total Applications</p>
+                                    </div>
+                                    <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1.5rem', borderRadius: '12px', textAlign: 'center', border: '1px solid var(--glass-border)' }}>
+                                        <BarChart size={28} color="#ffa500" style={{ margin: '0 auto 0.5rem auto' }} />
+                                        <h4 style={{ fontSize: '1.8rem', margin: '0 0 0.2rem 0' }}>{hrStats.avgScore}%</h4>
+                                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Avg. Match Score</p>
+                                    </div>
+                                    <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1.5rem', borderRadius: '12px', textAlign: 'center', border: '1px solid var(--glass-border)' }}>
+                                        <CheckCircle size={28} color="#66fcf1" style={{ margin: '0 auto 0.5rem auto' }} />
+                                        <h4 style={{ fontSize: '1.8rem', margin: '0 0 0.2rem 0' }}>{hrStats.acceptedCount}</h4>
+                                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Candidates Shortlisted</p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)', border: '1px dashed var(--glass-border)', borderRadius: '12px' }}>
+                                    Loading your pipeline stats...
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
