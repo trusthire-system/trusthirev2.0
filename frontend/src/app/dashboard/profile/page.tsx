@@ -5,7 +5,7 @@ import {
     User, Mail, Star, GraduationCap, Briefcase,
     FileUp, CheckCircle2, AlertCircle, ExternalLink,
     Save, CloudUpload, TrendingUp, Phone, MapPin, Clock,
-    Users, BarChart, CheckCircle
+    Users, BarChart, CheckCircle, Award, Trash2
 } from "lucide-react";
 
 export default function ProfilePage() {
@@ -145,7 +145,11 @@ export default function ProfilePage() {
 
     const handleCertUpload = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!certFile || !certName || !certCategory) return;
+        console.log("[DEBUG] Starting certificate upload process...");
+        if (!certFile || !certName || !certCategory) {
+            console.warn("[WARNING] Missing certificate file, name, or category.");
+            return;
+        }
 
         setUploadingCert(true);
         setError("");
@@ -155,24 +159,51 @@ export default function ProfilePage() {
         fileData.append("certificate", certFile);
         fileData.append("name", certName);
         fileData.append("category", certCategory);
+        console.log(`[INFO] Uploading file: ${certFile.name}, size: ${certFile.size} bytes`);
 
         try {
             const res = await fetch("/api/certificates", {
                 method: "POST",
                 body: fileData
             });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error);
 
+            console.log(`[INFO] Upload request status: ${res.status}`);
+            const data = await res.json();
+
+            if (!res.ok) {
+                console.error("[ERROR] Upload failed:", data.error);
+                throw new Error(data.error);
+            }
+
+            console.log("[SUCCESS] Certificate processed:", data);
             setSuccess("Certificate uploaded securely. AI Verification processed.");
             setCertFile(null);
             setCertName("");
-            loadProfileData();
+            loadProfileData(); // Reload to show the new certificate from DB
             setTimeout(() => setSuccess(""), 5000);
         } catch (err: any) {
+            console.error("[CRITICAL] handleCertUpload Error:", err);
             setError(err.message);
         } finally {
             setUploadingCert(false);
+        }
+    };
+
+    const handleDeleteCert = async (certId: string) => {
+        if (!confirm("Are you sure you want to delete this certificate?")) return;
+
+        try {
+            const res = await fetch(`/api/certificates?id=${certId}`, {
+                method: "DELETE"
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error);
+
+            setSuccess("Certificate deleted successfully.");
+            loadProfileData(); // Reload to update the list
+            setTimeout(() => setSuccess(""), 3000);
+        } catch (err: any) {
+            setError(err.message);
         }
     };
 
@@ -184,7 +215,7 @@ export default function ProfilePage() {
 
     if (!user) return <div>Could not load profile. Please try refreshing.</div>;
 
-    const skillsArray = formData.skills.split(',').map(s => s.trim()).filter(s => s.length > 0);
+    const skillsArray = formData.skills.split(',').map(s => s.trim()).filter(s => (s && s.length > 0));
 
     const profileStrengthLabel =
         identityStrength === 100 ? "Complete" :
@@ -434,14 +465,30 @@ export default function ProfilePage() {
                                                 <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{cert.name}</span>
                                                 <span style={{ fontSize: '0.75rem', color: 'var(--accent-color)', padding: '2px 8px', background: 'rgba(102,252,241,0.1)', borderRadius: '100px' }}>{cert.category}</span>
                                             </div>
+                                            {cert.issuer && (
+                                                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
+                                                    Issued by {cert.issuer} to {cert.recipient}
+                                                </p>
+                                            )}
                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.8rem' }}>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                                                     {cert.isVerified ? <CheckCircle2 size={14} color="#00cc66" /> : <AlertCircle size={14} color="#ff4a4a" />}
                                                     <span style={{ color: cert.isVerified ? '#00cc66' : '#ff4a4a' }}>
-                                                        {cert.isVerified ? `Verified (Score: ${cert.confidenceScore})` : `Not Verified (Score: ${cert.confidenceScore})`}
+                                                        {cert.isVerified ? `Verified (Score: ${cert.confidenceScore}%)` : `AI Analysis: ${cert.confidenceScore}%`}
                                                     </span>
                                                 </div>
-                                                <a href={cert.fileUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--text-secondary)' }}>View <ExternalLink size={12} /></a>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                    <a href={cert.fileUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--text-secondary)' }} title="View Certificate">
+                                                        <ExternalLink size={16} />
+                                                    </a>
+                                                    <button
+                                                        onClick={() => handleDeleteCert(cert.id)}
+                                                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                                                        title="Delete Certificate"
+                                                    >
+                                                        <Trash2 size={16} color="#ff4a4a" />
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                     ))}
@@ -461,7 +508,7 @@ export default function ProfilePage() {
                                 </select>
                                 <input type="file" accept=".pdf" onChange={e => setCertFile(e.target.files?.[0] || null)} style={{ display: 'none' }} id="cert-upload" />
                                 <label htmlFor="cert-upload" className="btn-secondary" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: 'pointer' }}>
-                                    <CloudUpload size={18} /> {certFile ? certFile.name : "Choose File (PDF)"}
+                                    <Award size={18} /> {certFile ? certFile.name : "Choose File (PDF)"}
                                 </label>
                                 <button type="submit" className="btn-primary" disabled={!certFile || !certName || uploadingCert} style={{ width: '100%' }}>
                                     {uploadingCert ? "Uploading & Verifying..." : "Upload & Verify"}

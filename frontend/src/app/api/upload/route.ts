@@ -50,7 +50,7 @@ export async function POST(req: Request) {
                 mlFormData.append("resume_path", absolutePath);
 
                 logger.info(`Sending file to ML service at ${absolutePath}`);
-                const mlRes = await fetch("http://127.0.0.1:8000/api/extract", {
+                const mlRes = await fetch("http://127.0.0.1:8001/api/extract", {
                     method: "POST",
                     body: mlFormData
                 });

@@ -52,8 +52,13 @@ model Certificate {
   name            String
   category        String   // "EDUCATION", "COURSE", "ACHIEVEMENT"
   fileUrl         String
+  issuer          String?
+  recipient       String?
+  date            String?
+  type            String?
   isVerified      Boolean  @default(false)
   confidenceScore Int      @default(0)
+  reasoning       String?
   createdAt       DateTime @default(now())
 }
 

@@ -27,6 +27,25 @@ def print_error(message):
 def print_success(message):
     print(f"{GREEN}==>{NC} {message}")
 
+def kill_port_owner(port):
+    """Kills the process listening on the specified port (Windows only)."""
+    if os.name != 'nt': return
+    try:
+        output = subprocess.check_output(f'netstat -ano | findstr :{port}', shell=True).decode()
+        for line in output.splitlines():
+            if 'LISTENING' in line:
+                pid = line.strip().split()[-1]
+                if pid and pid != '0':
+                    print(f"Cleaning up old process {pid} on port {port}...")
+                    subprocess.run(f'taskkill /F /T /PID {pid}', shell=True, capture_output=True)
+    except:
+        pass
+
+def cleanup_ports():
+    print_step("Cleaning up ports 3000, 8000, 8001...")
+    for port in [3000, 8000, 8001]:
+        kill_port_owner(port)
+
 def find_executable(name):
     """Finds the path to an executable across platforms."""
     if os.name == 'nt':
@@ -201,6 +220,9 @@ def main():
     print(f"{BLUE}    TrustHire Automated Dev Environment {NC}")
     print(f"{BLUE}========================================{NC}")
     
+    # 0. Cleanup ports
+    cleanup_ports()
+    
     run_prod = '--build' in sys.argv or '--prod' in sys.argv
     
     # 1. Setup Backend
@@ -243,7 +265,7 @@ def main():
         processes.append(frontend_proc)
         
         print(f"\n{GREEN}Both services are running!{NC}")
-        print(f"Backend Server:  {BLUE}http://localhost:8000{NC} (or as configured in main.py)")
+        print(f"Backend Server:  {BLUE}http://localhost:8001{NC} (or as configured in main.py)")
         print(f"Frontend Server: {CYAN}http://localhost:3000{NC} ({server_type})")
         print(f"Press {RED}Ctrl+C{NC} to stop both services.\n")
         

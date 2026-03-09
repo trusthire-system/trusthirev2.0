@@ -3,6 +3,8 @@ import requests
 from fastapi import FastAPI, UploadFile, Form
 from pypdf import PdfReader
 import re
+import google.generativeai as genai
+from typing import List, Dict, Any, Optional
 
 app = FastAPI()
 
@@ -260,66 +262,193 @@ async def score_resume(
         "links": links
     }
 
+@app.get("/api/health")
+async def health_check():
+    return {"status": "ok", "gemini_configured": bool(GEMINI_API_KEY)}
+
+# Configure Gemini
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+
+# Local development helper: Load from frontend/.env if available
+if not GEMINI_API_KEY:
+    try:
+        # Try multiple possible locations for .env
+        paths = [
+            os.path.join(os.path.dirname(__file__), "..", "frontend", ".env"),
+            os.path.join(os.getcwd(), "frontend", ".env"),
+            os.path.join(os.getcwd(), "..", "frontend", ".env"),
+            ".env"
+        ]
+        for env_path in paths:
+            if os.path.exists(env_path):
+                with open(env_path, "r") as f:
+                    for line in f:
+                        if "GEMINI_API_KEY" in line and "=" in line:
+                            val = line.split("=", 1)[1].strip().strip('"').strip("'")
+                            if val:
+                                GEMINI_API_KEY = val
+                                os.environ["GEMINI_API_KEY"] = GEMINI_API_KEY
+                                print(f"[INFO] Backend successfully loaded GEMINI_API_KEY from {env_path}")
+                                break
+            if GEMINI_API_KEY: break
+    except Exception as e:
+        print(f"[WARNING] Backend could not auto-load frontend .env: {e}")
+
+if GEMINI_API_KEY:
+    try:
+        genai.configure(api_key=GEMINI_API_KEY)
+        print("[INFO] Gemini AI has been configured.")
+    except Exception as e:
+        print(f"[ERROR] Failed to configure Gemini: {e}")
+else:
+    print("[WARNING] GEMINI_API_KEY is missing. AI features will be disabled.")
+
 @app.post("/api/verify-certificate")
 async def verify_certificate(file_path: str = Form(...)):
-    """Robust certificate verification."""
+    """Re-implemented verification using Gemini for intelligent analysis."""
+    print(f"[DEBUG] Received verification request for: {file_path}")
     if not os.path.exists(file_path):
+        print(f"[ERROR] File not found: {file_path}")
         return {"success": False, "error": "File not found"}
     
+    # Attempt to extract text
     text = extract_text_from_pdf(file_path)
-    clean = text.lower()
+    print(f"[DEBUG] Extracted {len(text)} characters from PDF.")
     
-    # 1. Date Detection (Expanded to include months)
-    has_date = bool(re.search(r'(\b\d{4}\b|\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}|\b(?:january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2},?\s+\d{4}\b)', clean))
-    
-    # 2. Issuer Detection (Expanded terminology)
-    has_issuer = bool(re.search(r'\b(university|institute|academy|board|authority|issued by|certifies|awarded to|presented to|school|college|coursera|udemy|edx|microsoft|google|aws|cisco)\b', clean))
-    
-    # 3. Seal / Signature / Authenticity Verification
-    has_seal = bool(re.search(r'\b(seal|authentic|signature|signed|director|president|dean|verified|credential|authorized|completion|certified)\b', clean))
-    
-    # 4. Tampering detection via PDF Metadata (only heuristic-based, removing raw text match for "edit")
-    is_tampered = False
-    metadata_issue = False
-    try:
-        reader = PdfReader(file_path)
-        meta = reader.metadata
-        if meta:
-            producer = str(meta.get('/Producer', '')).lower()
-            if 'illustrator' in producer or 'photoshop' in producer or 'gimp' in producer:
-                is_tampered = True
-            
-            cdate = meta.get('/CreationDate')
-            mdate = meta.get('/ModDate')
-            if cdate and mdate and cdate != mdate:
-                # Basic check, if modified date length is large and they differ
-                metadata_issue = True
-    except Exception:
-        pass
-
-    confidence_score = 0
-    if has_date: confidence_score += 30
-    if has_issuer: confidence_score += 40
-    if has_seal: confidence_score += 30
-    
-    if is_tampered: 
-        confidence_score -= 50
-    elif metadata_issue:
-        confidence_score -= 20
-        
-    return {
-        "success": True,
-        "extracted_text": text[:500],
-        "confidenceScore": max(0, min(100, confidence_score)),
-        "isVerified": confidence_score >= 70,
-        "metadata": {
-            "hasDate": has_date,
-            "hasIssuer": has_issuer,
-            "hasSeal": has_seal,
-            "isTampered": is_tampered
+    # Fallback to local logic if no API key
+    if not GEMINI_API_KEY:
+        print("[INFO] GEMINI_API_KEY not found. Using local fallback logic.")
+        clean = text.lower()
+        has_date = bool(re.search(r'(\d{4}|\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}|\b(?:january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2},?\s+\d{4}\b)', clean))
+        has_issuer = bool(re.search(r'\b(university|institute|academy|board|authority|issued|certifies|awarded|completion)\b', clean))
+        confidence_score = 40 if has_date else 0
+        if has_issuer: confidence_score += 50
+        print(f"[DEBUG] Local verification result: isVerified={confidence_score >= 60}, score={confidence_score}")
+        return {
+            "success": True, 
+            "isVerified": confidence_score >= 60,
+            "confidenceScore": confidence_score,
+            "note": "Using local fallback. Set GEMINI_API_KEY for AI verification.",
+            "extracted_text": text[:200]
         }
-    }
+
+    try:
+        print("[INFO] Attempting Gemini AI verification...")
+        
+        # List of models to try in order of preference
+        models_to_try = [
+            'gemini-2.0-flash',
+            'gemini-flash-latest',
+            'gemini-2.0-flash-lite',
+            'gemini-pro-latest',
+            'gemini-1.5-flash',
+            'gemini-pro'
+        ]
+        
+        last_error = ""
+        response = None
+        
+        # Prepare inputs for Gemini (Multimodal Support)
+        inputs = ["""
+        Analyze the provided data (text or file) from a certificate. 
+        Determine if it is a valid educational or professional certificate.
+        
+        Strictly return a JSON object with EXACTLY these keys:
+        - is_valid: boolean (true if it looks like a real certificate)
+        - institution: string (the school, university, or company that issued it)
+        - recipient: string (the person who received it)
+        - date: string (the date of issue)
+        - type: string (e.g., "Bachelors", "Course Completion", "Award")
+        - confidence_score: integer (0-100)
+        - reasoning: string (short explanation)
+        """]
+        
+        if len(text.strip()) < 50:
+            print("[INFO] Text extraction is minimal. Sending file bytes for native PDF analysis.")
+            with open(file_path, "rb") as f:
+                pdf_data = f.read()
+            inputs.append({
+                "mime_type": "application/pdf",
+                "data": pdf_data
+            })
+        else:
+            inputs.append(f"Text to analyze:\n{text[:5000]}")
+
+        for model_name in models_to_try:
+            # Try both raw name and models/ name
+            names_to_try = [model_name, f"models/{model_name}"]
+            success_model = False
+            for name in names_to_try:
+                try:
+                    print(f"[INFO] Trying model: {name}")
+                    model = genai.GenerativeModel(name)
+                    # Simple call to verify if model is actually accessible
+                    response = model.generate_content(inputs)
+                    if response:
+                        print(f"[SUCCESS] Successfully used model: {name}")
+                        success_model = True
+                        break
+                except Exception as e:
+                    last_error = str(e)
+                    print(f"[WARNING] Model {name} failed: {last_error}")
+            if success_model:
+                break
+        
+        if not response:
+            return {"success": False, "error": f"All Gemini models failed. Last error: {last_error}"}
+            
+        # Extract JSON from response
+        raw_output = response.text
+        print(f"[DEBUG] AI Raw Response:\n{raw_output}")
+        
+        import json
+        json_match = re.search(r'\{.*\}', raw_output, re.DOTALL)
+        
+        result = {}
+        if json_match:
+            json_str = json_match.group(0)
+            try:
+                result = json.loads(json_str)
+                # Success parsing, but potentially missing keys
+                if result.get("is_valid") and (not result.get("confidence_score") or result.get("confidence_score") == 0):
+                    result["confidence_score"] = 85
+            except Exception as e:
+                print(f"[WARNING] JSON parse error: {e}. Falling back to regex.")
+                # Last resort regex extraction
+                result = {
+                    "is_valid": "true" in json_str.lower(),
+                    "confidence_score": 85 if "true" in json_str.lower() else 30,
+                    "institution": "Unknown",
+                    "recipient": "Unknown",
+                    "date": "Unknown",
+                    "type": "Unknown",
+                    "reasoning": "Extracted with regex fallback"
+                }
+                # Try to extract institution
+                inst_match = re.search(r'"institution":\s*"([^"]*)"', json_str)
+                if inst_match: result["institution"] = inst_match.group(1)
+        else:
+            return {"success": False, "error": "AI response was not in JSON format"}
+
+        print(f"[DEBUG] Final processed result: {result}")
+
+        return {
+            "success": True,
+            "isVerified": result.get("is_valid", False) and result.get("confidence_score", 0) >= 60,
+            "confidenceScore": result.get("confidence_score", 0),
+            "details": {
+                "issuer": result.get("institution", "Unknown"),
+                "recipient": result.get("recipient", "Unknown"),
+                "date": result.get("date", "Unknown"),
+                "type": result.get("type", "Unknown")
+            },
+            "reasoning": result.get("reasoning", "")
+        }
+
+    except Exception as e:
+        print(f"[CRITICAL] Gemini Verification Error: {e}")
+        return {"success": False, "error": str(e)}
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8001)
